@@ -1,0 +1,23 @@
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    volumes:
+      - ./src:/app/src
+    env_file:
+      - .env
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"

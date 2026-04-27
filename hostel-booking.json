@@ -1,0 +1,671 @@
+{
+  "info": {
+    "_postman_id": "b7e2f4a1-3c90-4d58-a812-6f05d9e1c347",
+    "name": "Hostel Booking API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "student",
+                  "description": "Optional. Filter by role: university | landlord | student",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Universities",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/universities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "universities"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Landlords",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/landlords",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "landlords"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Students",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "students"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create University",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"university_name\": \"University of Lagos\",\n  \"location\": \"Lagos, Nigeria\",\n  \"type\": \"government\",\n  \"email\": \"admin@unilag.edu.ng\",\n  \"password\": \"SecurePass123!\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/universities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "universities"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}/suspend",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "{{userId}}", "suspend"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unsuspend User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}/unsuspend",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "{{userId}}", "unsuspend"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "{{userId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "University",
+      "item": [
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_password\": \"NewSecurePass123!\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/university/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "university", "auth", "reset-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/university/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "university", "auth", "logout"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Landlord",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "full_name", "value": "Emeka Okafor", "type": "text" },
+                { "key": "gender", "value": "male", "type": "text" },
+                { "key": "nin", "value": "12345678901", "type": "text" },
+                { "key": "marital_status", "value": "married", "type": "text" },
+                { "key": "whatsapp_number", "value": "+2348012345678", "type": "text" },
+                { "key": "email", "value": "emeka@landlord.com", "type": "text" },
+                { "key": "password", "value": "TempPass123!", "type": "text" },
+                { "key": "ownership_documents", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/university/landlords",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "university", "landlords"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Landlords",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/university/landlords",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "university", "landlords"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Students",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/university/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "university", "students"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hostels",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/university/hostels",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "university", "hostels"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Landlord",
+      "item": [
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_password\": \"NewSecurePass123!\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "auth", "reset-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "auth", "logout"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Hostel",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "hostel_name", "value": "Palm Court Hostel", "type": "text" },
+                { "key": "location", "value": "15 University Road, Akoka", "type": "text" },
+                { "key": "description", "value": "A clean and secure hostel close to campus.", "type": "text" },
+                { "key": "whatsapp_number", "value": "+2348012345678", "type": "text" },
+                { "key": "images", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/hostels",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "hostels"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Hostels",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/hostels",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "hostels"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Hostel",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/hostels/{{hostelId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "hostels", "{{hostelId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Room to Hostel",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_type\": \"single_self_contained\",\n  \"price\": 150000,\n  \"capacity\": 1\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/hostels/{{hostelId}}/rooms",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "hostels", "{{hostelId}}", "rooms"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Room",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_type\": \"double_self_contained\",\n  \"price\": 200000,\n  \"capacity\": 2\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/hostels/{{hostelId}}/rooms/{{roomId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "hostels", "{{hostelId}}", "rooms", "{{roomId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/landlord/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "landlord", "notifications"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Student",
+      "item": [
+        {
+          "name": "List Universities (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/universities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "universities"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"registration_number\": \"200401001\",\n  \"surname\": \"Adeyemi\",\n  \"other_names\": \"Kehinde James\",\n  \"gender\": \"male\",\n  \"student_email\": \"kehinde@student.edu.ng\",\n  \"password\": \"SecurePass123!\",\n  \"university_id\": \"{{universityId}}\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/student/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "auth", "logout"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hostels (University-scoped)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/hostels",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "hostels"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Hostel",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/hostels/{{hostelId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "hostels", "{{hostelId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "notifications"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Booking",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"room_id\": \"{{roomId}}\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/student/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "bookings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "bookings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Booking",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "bookings", "{{bookingId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Terminate Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}/terminate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "bookings", "{{bookingId}}", "terminate"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_method\": \"mtn_mobile_money\",\n  \"payment_type\": \"partial\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "bookings", "{{bookingId}}", "payments"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payments for Booking",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "student", "bookings", "{{bookingId}}", "payments"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
