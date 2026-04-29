@@ -4,7 +4,7 @@ import * as service from "./university.service";
 
 export const resetPassword: RequestHandler = async (req, res, next) => {
   try {
-    const { clerkId, user } = req.auth!;
+    const { clerkId, user } = req.userContext!;
     await service.resetPassword(clerkId, user.id, req.body.new_password as string);
     res.json({
       success: true,
@@ -33,7 +33,7 @@ export const logout: RequestHandler = async (req, res, next) => {
 export const createLandlord: RequestHandler = async (req, res, next) => {
   try {
     const files = (req.files ?? []) as Express.Multer.File[];
-    const data = await service.registerLandlord(req.auth!.user.id, req.body as import("./university.schema").CreateLandlordInput, files);
+    const data = await service.registerLandlord(req.userContext!.user.id, req.body as import("./university.schema").CreateLandlordInput, files);
     res.status(201).json({
       success: true,
       message: "Landlord registered successfully",
@@ -46,7 +46,7 @@ export const createLandlord: RequestHandler = async (req, res, next) => {
 
 export const getLandlords: RequestHandler = async (req, res, next) => {
   try {
-    const data = await service.listLandlords(req.auth!.user.id);
+    const data = await service.listLandlords(req.userContext!.user.id);
     res.json({ success: true, message: "Landlords fetched successfully", data });
   } catch (err) {
     next(err);
@@ -55,7 +55,7 @@ export const getLandlords: RequestHandler = async (req, res, next) => {
 
 export const getStudents: RequestHandler = async (req, res, next) => {
   try {
-    const data = await service.listStudents(req.auth!.user.id);
+    const data = await service.listStudents(req.userContext!.user.id);
     res.json({ success: true, message: "Students fetched successfully", data });
   } catch (err) {
     next(err);
@@ -64,7 +64,7 @@ export const getStudents: RequestHandler = async (req, res, next) => {
 
 export const getHostels: RequestHandler = async (req, res, next) => {
   try {
-    const data = await service.listHostels(req.auth!.user.id);
+    const data = await service.listHostels(req.userContext!.user.id);
     res.json({ success: true, message: "Hostels fetched successfully", data });
   } catch (err) {
     next(err);

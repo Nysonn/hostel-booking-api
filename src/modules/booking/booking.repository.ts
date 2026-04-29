@@ -1,24 +1,11 @@
-import { and, desc, eq } from "drizzle-orm";
-import { db } from "../../db";
-import {
-  bookings,
-  hostels,
-  landlords,
-  rooms,
-  students,
-} from "../../db/schema";
+import { prisma } from "../../db";
 
 // ---------------------------------------------------------------------------
 // Student profile lookup
 // ---------------------------------------------------------------------------
 
 export async function findStudentByUserId(userId: string) {
-  const [student] = await db
-    .select()
-    .from(students)
-    .where(eq(students.userId, userId))
-    .limit(1);
-  return student ?? null;
+  return prisma.student.findUnique({ where: { userId } });
 }
 
 // ---------------------------------------------------------------------------
@@ -26,58 +13,40 @@ export async function findStudentByUserId(userId: string) {
 // ---------------------------------------------------------------------------
 
 export async function createBookingTx(studentId: string, roomId: string) {
-  return db.transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     // Lock room and re-validate availability inside transaction
-    const [room] = await tx
-      .select()
-      .from(rooms)
-      .where(eq(rooms.id, roomId))
-      .limit(1);
+    const room = await tx.room.findUnique({ where: { id: roomId } });
 
     if (!room)
       throw Object.assign(new Error("Room not found"), { status: 404 });
 
     if (!room.isAvailable || room.occupiedSlots >= room.capacity)
-      throw Object.assign(new Error("Room has no available slots"), {
-        status: 400,
-      });
+      throw Object.assign(new Error("Room has no available slots"), { status: 400 });
 
     // Prevent double-booking
-    const [existingBooking] = await tx
-      .select({ id: bookings.id })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.studentId, studentId),
-          eq(bookings.status, "active")
-        )
-      )
-      .limit(1);
+    const existingBooking = await tx.booking.findFirst({
+      where: { studentId, status: "active" },
+    });
 
     if (existingBooking)
-      throw Object.assign(
-        new Error("You already have an active booking"),
-        { status: 400 }
-      );
+      throw Object.assign(new Error("You already have an active booking"), { status: 400 });
 
     // Insert booking
-    const [newBooking] = await tx
-      .insert(bookings)
-      .values({ studentId, roomId, status: "active" })
-      .returning();
+    const newBooking = await tx.booking.create({
+      data: { studentId, roomId, status: "active" },
+    });
 
     // Update room occupancy
     const newOccupied = room.occupiedSlots + 1;
     const nowFull = newOccupied >= room.capacity;
 
-    await tx
-      .update(rooms)
-      .set({
+    await tx.room.update({
+      where: { id: roomId },
+      data: {
         occupiedSlots: newOccupied,
         ...(nowFull && { isAvailable: false }),
-        updatedAt: new Date(),
-      })
-      .where(eq(rooms.id, roomId));
+      },
+    });
 
     return { booking: newBooking };
   });
@@ -87,19 +56,11 @@ export async function createBookingTx(studentId: string, roomId: string) {
 // Terminate booking — fully transactional
 // ---------------------------------------------------------------------------
 
-export async function terminateBookingTx(
-  bookingId: string,
-  studentId: string
-) {
-  return db.transaction(async (tx) => {
-    // Validate ownership and status
-    const [booking] = await tx
-      .select()
-      .from(bookings)
-      .where(
-        and(eq(bookings.id, bookingId), eq(bookings.studentId, studentId))
-      )
-      .limit(1);
+export async function terminateBookingTx(bookingId: string, studentId: string) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findFirst({
+      where: { id: bookingId, studentId },
+    });
 
     if (!booking)
       throw Object.assign(new Error("Booking not found"), { status: 404 });
@@ -107,31 +68,22 @@ export async function terminateBookingTx(
     if (booking.status !== "active")
       throw Object.assign(new Error("Booking is not active"), { status: 400 });
 
-    // Update booking status
-    const [updatedBooking] = await tx
-      .update(bookings)
-      .set({ status: "terminated", updatedAt: new Date() })
-      .where(eq(bookings.id, bookingId))
-      .returning();
+    const updatedBooking = await tx.booking.update({
+      where: { id: bookingId },
+      data: { status: "terminated" },
+    });
 
-    // Read current room state inside transaction
-    const [room] = await tx
-      .select()
-      .from(rooms)
-      .where(eq(rooms.id, booking.roomId))
-      .limit(1);
-
-    const newOccupied = Math.max(0, room.occupiedSlots - 1);
-
-    await tx
-      .update(rooms)
-      .set({
-        occupiedSlots: newOccupied,
-        // Restore availability only if the room was marked full
-        ...(!room.isAvailable && { isAvailable: true }),
-        updatedAt: new Date(),
-      })
-      .where(eq(rooms.id, booking.roomId));
+    const room = await tx.room.findUnique({ where: { id: booking.roomId } });
+    if (room) {
+      const newOccupied = Math.max(0, room.occupiedSlots - 1);
+      await tx.room.update({
+        where: { id: booking.roomId },
+        data: {
+          occupiedSlots: newOccupied,
+          ...(!room.isAvailable && { isAvailable: true }),
+        },
+      });
+    }
 
     return { booking: updatedBooking };
   });
@@ -142,22 +94,19 @@ export async function terminateBookingTx(
 // ---------------------------------------------------------------------------
 
 export async function findBookingContext(bookingId: string) {
-  const [result] = await db
-    .select({
-      booking: bookings,
-      student: students,
-      room: rooms,
-      hostel: hostels,
-      landlord: landlords,
-    })
-    .from(bookings)
-    .innerJoin(students, eq(bookings.studentId, students.id))
-    .innerJoin(rooms, eq(bookings.roomId, rooms.id))
-    .innerJoin(hostels, eq(rooms.hostelId, hostels.id))
-    .innerJoin(landlords, eq(hostels.landlordId, landlords.id))
-    .where(eq(bookings.id, bookingId))
-    .limit(1);
-  return result ?? null;
+  return prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      student: true,
+      room: {
+        include: {
+          hostel: {
+            include: { landlord: true },
+          },
+        },
+      },
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -165,27 +114,16 @@ export async function findBookingContext(bookingId: string) {
 // ---------------------------------------------------------------------------
 
 export function findBookingsByStudentId(studentId: string) {
-  return db
-    .select({ booking: bookings, room: rooms, hostel: hostels })
-    .from(bookings)
-    .innerJoin(rooms, eq(bookings.roomId, rooms.id))
-    .innerJoin(hostels, eq(rooms.hostelId, hostels.id))
-    .where(eq(bookings.studentId, studentId))
-    .orderBy(desc(bookings.createdAt));
+  return prisma.booking.findMany({
+    where: { studentId },
+    include: { room: { include: { hostel: true } } },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
-export async function findBookingByIdAndStudentId(
-  bookingId: string,
-  studentId: string
-) {
-  const [result] = await db
-    .select({ booking: bookings, room: rooms, hostel: hostels })
-    .from(bookings)
-    .innerJoin(rooms, eq(bookings.roomId, rooms.id))
-    .innerJoin(hostels, eq(rooms.hostelId, hostels.id))
-    .where(
-      and(eq(bookings.id, bookingId), eq(bookings.studentId, studentId))
-    )
-    .limit(1);
-  return result ?? null;
+export async function findBookingByIdAndStudentId(bookingId: string, studentId: string) {
+  return prisma.booking.findFirst({
+    where: { id: bookingId, studentId },
+    include: { room: { include: { hostel: true } } },
+  });
 }

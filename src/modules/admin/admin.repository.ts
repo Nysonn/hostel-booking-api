@@ -1,71 +1,38 @@
-import { and, eq, inArray, ne } from "drizzle-orm";
-import { db } from "../../db";
-import {
-  bookings,
-  hostels,
-  landlords,
-  notifications,
-  payments,
-  rooms,
-  students,
-  universities,
-  users,
-} from "../../db/schema";
+import { prisma } from "../../db";
 
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
 export function findAllNonAdminUsers(role?: string) {
-  return db
-    .select({
-      user: users,
-      university: universities,
-      landlord: landlords,
-      student: students,
-    })
-    .from(users)
-    .leftJoin(universities, eq(users.id, universities.userId))
-    .leftJoin(landlords, eq(users.id, landlords.userId))
-    .leftJoin(students, eq(users.id, students.userId))
-    .where(
-      and(
-        ne(users.role, "admin"),
-        role
-          ? eq(users.role, role as "university" | "landlord" | "student")
-          : undefined
-      )
-    );
+  return prisma.user.findMany({
+    where: {
+      role: role
+        ? { equals: role as "university" | "landlord" | "student" }
+        : { not: "admin" },
+    },
+    include: {
+      university: true,
+      landlord: true,
+      student: true,
+    },
+  });
 }
 
 export function findAllUniversities() {
-  return db
-    .select({ university: universities, user: users })
-    .from(universities)
-    .leftJoin(users, eq(universities.userId, users.id));
+  return prisma.university.findMany({ include: { user: true } });
 }
 
 export function findAllLandlords() {
-  return db
-    .select({ landlord: landlords, university: universities })
-    .from(landlords)
-    .leftJoin(universities, eq(landlords.universityId, universities.id));
+  return prisma.landlord.findMany({ include: { university: true } });
 }
 
 export function findAllStudents() {
-  return db
-    .select({ student: students, university: universities })
-    .from(students)
-    .leftJoin(universities, eq(students.universityId, universities.id));
+  return prisma.student.findMany({ include: { university: true } });
 }
 
 export async function findUserByInternalId(userId: string) {
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  return user ?? null;
+  return prisma.user.findUnique({ where: { id: userId } });
 }
 
 // ---------------------------------------------------------------------------
@@ -73,10 +40,7 @@ export async function findUserByInternalId(userId: string) {
 // ---------------------------------------------------------------------------
 
 export async function updateSuspension(userId: string, isSuspended: boolean) {
-  await db
-    .update(users)
-    .set({ isSuspended, updatedAt: new Date() })
-    .where(eq(users.id, userId));
+  await prisma.user.update({ where: { id: userId }, data: { isSuspended } });
 }
 
 export async function createUserAndUniversity(
@@ -88,22 +52,20 @@ export async function createUserAndUniversity(
     email: string;
   }
 ) {
-  return db.transaction(async (tx) => {
-    const [newUser] = await tx
-      .insert(users)
-      .values({ clerkId, role: "university" })
-      .returning();
+  return prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: { clerkId, role: "university" },
+    });
 
-    const [newUniversity] = await tx
-      .insert(universities)
-      .values({
+    const newUniversity = await tx.university.create({
+      data: {
         userId: newUser.id,
         universityName: data.universityName,
         location: data.location,
         type: data.type,
         email: data.email,
-      })
-      .returning();
+      },
+    });
 
     return { user: newUser, university: newUniversity };
   });
@@ -113,164 +75,148 @@ export async function deleteUserCascade(
   userId: string,
   userRole: string
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     // ── Student ──────────────────────────────────────────────────────────────
     if (userRole === "student") {
-      const [student] = await tx
-        .select({ id: students.id })
-        .from(students)
-        .where(eq(students.userId, userId));
+      const student = await tx.student.findUnique({ where: { userId } });
 
       if (student) {
-        await tx.delete(payments).where(eq(payments.studentId, student.id));
-        await tx.delete(bookings).where(eq(bookings.studentId, student.id));
-        await tx.delete(students).where(eq(students.id, student.id));
+        await tx.payment.deleteMany({ where: { studentId: student.id } });
+        await tx.booking.deleteMany({ where: { studentId: student.id } });
+        await tx.student.delete({ where: { id: student.id } });
       }
     }
 
     // ── Landlord ─────────────────────────────────────────────────────────────
     if (userRole === "landlord") {
-      const [landlord] = await tx
-        .select({ id: landlords.id })
-        .from(landlords)
-        .where(eq(landlords.userId, userId));
+      const landlord = await tx.landlord.findUnique({ where: { userId } });
 
       if (landlord) {
-        const hostelList = await tx
-          .select({ id: hostels.id })
-          .from(hostels)
-          .where(eq(hostels.landlordId, landlord.id));
+        const hostelIds = (
+          await tx.hostel.findMany({
+            where: { landlordId: landlord.id },
+            select: { id: true },
+          })
+        ).map((h) => h.id);
 
-        if (hostelList.length > 0) {
-          const hostelIds = hostelList.map((h) => h.id);
+        if (hostelIds.length > 0) {
+          const roomIds = (
+            await tx.room.findMany({
+              where: { hostelId: { in: hostelIds } },
+              select: { id: true },
+            })
+          ).map((r) => r.id);
 
-          const roomList = await tx
-            .select({ id: rooms.id })
-            .from(rooms)
-            .where(inArray(rooms.hostelId, hostelIds));
+          if (roomIds.length > 0) {
+            const bookingIds = (
+              await tx.booking.findMany({
+                where: { roomId: { in: roomIds } },
+                select: { id: true },
+              })
+            ).map((b) => b.id);
 
-          if (roomList.length > 0) {
-            const roomIds = roomList.map((r) => r.id);
-
-            const bookingList = await tx
-              .select({ id: bookings.id })
-              .from(bookings)
-              .where(inArray(bookings.roomId, roomIds));
-
-            if (bookingList.length > 0) {
-              const bookingIds = bookingList.map((b) => b.id);
-              await tx
-                .delete(payments)
-                .where(inArray(payments.bookingId, bookingIds));
-              await tx
-                .delete(bookings)
-                .where(inArray(bookings.id, bookingIds));
+            if (bookingIds.length > 0) {
+              await tx.payment.deleteMany({
+                where: { bookingId: { in: bookingIds } },
+              });
+              await tx.booking.deleteMany({
+                where: { id: { in: bookingIds } },
+              });
             }
 
-            await tx.delete(rooms).where(inArray(rooms.id, roomIds));
+            await tx.room.deleteMany({ where: { id: { in: roomIds } } });
           }
 
-          await tx.delete(hostels).where(inArray(hostels.id, hostelIds));
+          await tx.hostel.deleteMany({ where: { id: { in: hostelIds } } });
         }
 
-        await tx.delete(landlords).where(eq(landlords.id, landlord.id));
+        await tx.landlord.delete({ where: { id: landlord.id } });
       }
     }
 
     // ── University ───────────────────────────────────────────────────────────
     if (userRole === "university") {
-      const [univ] = await tx
-        .select({ id: universities.id })
-        .from(universities)
-        .where(eq(universities.userId, userId));
+      const univ = await tx.university.findUnique({ where: { userId } });
 
       if (univ) {
         // Students belonging to this university
-        const univStudents = await tx
-          .select({ id: students.id, userId: students.userId })
-          .from(students)
-          .where(eq(students.universityId, univ.id));
+        const univStudents = await tx.student.findMany({
+          where: { universityId: univ.id },
+          select: { id: true, userId: true },
+        });
 
         if (univStudents.length > 0) {
           const studentIds = univStudents.map((s) => s.id);
           const studentUserIds = univStudents.map((s) => s.userId);
-          await tx
-            .delete(payments)
-            .where(inArray(payments.studentId, studentIds));
-          await tx
-            .delete(bookings)
-            .where(inArray(bookings.studentId, studentIds));
-          await tx
-            .delete(notifications)
-            .where(inArray(notifications.userId, studentUserIds));
-          await tx.delete(students).where(inArray(students.id, studentIds));
-          await tx.delete(users).where(inArray(users.id, studentUserIds));
+
+          await tx.payment.deleteMany({ where: { studentId: { in: studentIds } } });
+          await tx.booking.deleteMany({ where: { studentId: { in: studentIds } } });
+          await tx.notification.deleteMany({ where: { userId: { in: studentUserIds } } });
+          await tx.student.deleteMany({ where: { id: { in: studentIds } } });
+          await tx.user.deleteMany({ where: { id: { in: studentUserIds } } });
         }
 
         // Landlords belonging to this university
-        const univLandlords = await tx
-          .select({ id: landlords.id, userId: landlords.userId })
-          .from(landlords)
-          .where(eq(landlords.universityId, univ.id));
+        const univLandlords = await tx.landlord.findMany({
+          where: { universityId: univ.id },
+          select: { id: true, userId: true },
+        });
 
         if (univLandlords.length > 0) {
           const landlordIds = univLandlords.map((l) => l.id);
           const landlordUserIds = univLandlords.map((l) => l.userId);
 
-          const hostelList = await tx
-            .select({ id: hostels.id })
-            .from(hostels)
-            .where(inArray(hostels.landlordId, landlordIds));
+          const hostelIds = (
+            await tx.hostel.findMany({
+              where: { landlordId: { in: landlordIds } },
+              select: { id: true },
+            })
+          ).map((h) => h.id);
 
-          if (hostelList.length > 0) {
-            const hostelIds = hostelList.map((h) => h.id);
+          if (hostelIds.length > 0) {
+            const roomIds = (
+              await tx.room.findMany({
+                where: { hostelId: { in: hostelIds } },
+                select: { id: true },
+              })
+            ).map((r) => r.id);
 
-            const roomList = await tx
-              .select({ id: rooms.id })
-              .from(rooms)
-              .where(inArray(rooms.hostelId, hostelIds));
+            if (roomIds.length > 0) {
+              const bookingIds = (
+                await tx.booking.findMany({
+                  where: { roomId: { in: roomIds } },
+                  select: { id: true },
+                })
+              ).map((b) => b.id);
 
-            if (roomList.length > 0) {
-              const roomIds = roomList.map((r) => r.id);
-
-              const bookingList = await tx
-                .select({ id: bookings.id })
-                .from(bookings)
-                .where(inArray(bookings.roomId, roomIds));
-
-              if (bookingList.length > 0) {
-                const bookingIds = bookingList.map((b) => b.id);
-                await tx
-                  .delete(payments)
-                  .where(inArray(payments.bookingId, bookingIds));
-                await tx
-                  .delete(bookings)
-                  .where(inArray(bookings.id, bookingIds));
+              if (bookingIds.length > 0) {
+                await tx.payment.deleteMany({
+                  where: { bookingId: { in: bookingIds } },
+                });
+                await tx.booking.deleteMany({
+                  where: { id: { in: bookingIds } },
+                });
               }
 
-              await tx.delete(rooms).where(inArray(rooms.id, roomIds));
+              await tx.room.deleteMany({ where: { id: { in: roomIds } } });
             }
 
-            await tx.delete(hostels).where(inArray(hostels.id, hostelIds));
+            await tx.hostel.deleteMany({ where: { id: { in: hostelIds } } });
           }
 
-          await tx
-            .delete(notifications)
-            .where(inArray(notifications.userId, landlordUserIds));
-          await tx
-            .delete(landlords)
-            .where(inArray(landlords.id, landlordIds));
-          await tx.delete(users).where(inArray(users.id, landlordUserIds));
+          await tx.notification.deleteMany({
+            where: { userId: { in: landlordUserIds } },
+          });
+          await tx.landlord.deleteMany({ where: { id: { in: landlordIds } } });
+          await tx.user.deleteMany({ where: { id: { in: landlordUserIds } } });
         }
 
-        await tx.delete(universities).where(eq(universities.id, univ.id));
+        await tx.university.delete({ where: { id: univ.id } });
       }
     }
 
     // Always delete the target user's notifications then the user itself
-    await tx
-      .delete(notifications)
-      .where(eq(notifications.userId, userId));
-    await tx.delete(users).where(eq(users.id, userId));
+    await tx.notification.deleteMany({ where: { userId } });
+    await tx.user.delete({ where: { id: userId } });
   });
 }

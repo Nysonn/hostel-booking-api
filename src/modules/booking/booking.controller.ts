@@ -4,7 +4,7 @@ import * as service from "./booking.service";
 export const createBooking: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.createBooking(
-      req.auth!.user.id,
+      req.userContext!.user.id,
       req.body.room_id as string
     );
     res.status(201).json({
@@ -20,7 +20,7 @@ export const createBooking: RequestHandler = async (req, res, next) => {
 export const terminateBooking: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.terminateBooking(
-      req.auth!.user.id,
+      req.userContext!.user.id,
       String(req.params.bookingId)
     );
     res.json({
@@ -35,7 +35,7 @@ export const terminateBooking: RequestHandler = async (req, res, next) => {
 
 export const getBookings: RequestHandler = async (req, res, next) => {
   try {
-    const data = await service.listBookings(req.auth!.user.id);
+    const data = await service.listBookings(req.userContext!.user.id);
     res.json({ success: true, message: "Bookings fetched successfully", data });
   } catch (err) {
     next(err);
@@ -45,7 +45,7 @@ export const getBookings: RequestHandler = async (req, res, next) => {
 export const getBooking: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.getSingleBooking(
-      req.auth!.user.id,
+      req.userContext!.user.id,
       String(req.params.bookingId)
     );
     res.json({ success: true, message: "Booking fetched successfully", data });

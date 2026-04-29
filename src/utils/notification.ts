@@ -1,5 +1,4 @@
-import { db } from "../db";
-import { notifications } from "../db/schema";
+import { prisma } from "../db";
 
 export async function createNotification(params: {
   userId: string;
@@ -7,10 +6,12 @@ export async function createNotification(params: {
   body: string;
   type: string;
 }): Promise<void> {
-  await db.insert(notifications).values({
-    userId: params.userId,
-    title: params.title,
-    body: params.body,
-    type: params.type,
+  await prisma.notification.create({
+    data: {
+      userId: params.userId,
+      title: params.title,
+      body: params.body,
+      type: params.type,
+    },
   });
 }

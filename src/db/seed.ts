@@ -2,9 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { createClerkClient } from "@clerk/express";
-import { eq } from "drizzle-orm";
-import { db } from "./index";
-import { users } from "./schema";
+import { prisma } from "./index";
 
 const ADMIN_EMAIL = "info@hostelbooking.com";
 const ADMIN_PASSWORD = "Agumya2026!@nyson";
@@ -33,16 +31,12 @@ async function seed() {
   }
 
   // --- Local DB ---
-  const [existingDbUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
+  const existingDbUser = await prisma.user.findUnique({ where: { clerkId } });
 
   if (existingDbUser) {
     console.log("DB admin already exists — nothing to do.");
   } else {
-    await db.insert(users).values({ clerkId, role: "admin" });
+    await prisma.user.create({ data: { clerkId, role: "admin" } });
     console.log("Created DB admin record.");
   }
 
@@ -54,4 +48,5 @@ seed()
   .catch((err) => {
     console.error("Seed failed:", err);
     process.exit(1);
-  });
+  })
+  .finally(() => prisma.$disconnect());

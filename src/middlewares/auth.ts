@@ -1,8 +1,6 @@
 import { RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
-import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { users } from "../db/schema";
+import { prisma } from "../db";
 
 type UserRole = "admin" | "university" | "landlord" | "student";
 
@@ -15,18 +13,14 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.clerkId, userId))
-      .limit(1);
+    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
 
     if (!user) {
       res.status(401).json({ success: false, message: "Unauthorized: user not registered" });
       return;
     }
 
-    req.auth = { clerkId: userId, role: user.role, user };
+    req.userContext = { clerkId: userId, role: user.role, user };
     next();
   } catch (err) {
     next(err);
@@ -35,7 +29,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
 
 export const requireRole = (...roles: UserRole[]): RequestHandler => {
   return (req, res, next) => {
-    if (!req.auth || !roles.includes(req.auth.role)) {
+    if (!req.userContext || !roles.includes(req.userContext.role as UserRole)) {
       res.status(403).json({
         success: false,
         message: `Forbidden: requires role ${roles.join(" or ")}`,
@@ -47,7 +41,7 @@ export const requireRole = (...roles: UserRole[]): RequestHandler => {
 };
 
 export const requireNotSuspended: RequestHandler = (req, res, next) => {
-  if (req.auth?.user.isSuspended) {
+  if (req.userContext?.user.isSuspended) {
     res.status(403).json({
       success: false,
       message: "Forbidden: your account has been suspended",

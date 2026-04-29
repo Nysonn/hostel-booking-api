@@ -1,31 +1,15 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { db } from "../../db";
-import {
-  hostels,
-  landlords,
-  notifications,
-  rooms,
-  users,
-} from "../../db/schema";
+import { prisma } from "../../db";
 
 // ---------------------------------------------------------------------------
 // Landlord profile
 // ---------------------------------------------------------------------------
 
 export async function findLandlordByUserId(userId: string) {
-  const [landlord] = await db
-    .select()
-    .from(landlords)
-    .where(eq(landlords.userId, userId))
-    .limit(1);
-  return landlord ?? null;
+  return prisma.landlord.findUnique({ where: { userId } });
 }
 
 export async function updateFirstLogin(userId: string) {
-  await db
-    .update(users)
-    .set({ firstLogin: false, updatedAt: new Date() })
-    .where(eq(users.id, userId));
+  await prisma.user.update({ where: { id: userId }, data: { firstLogin: false } });
 }
 
 // ---------------------------------------------------------------------------
@@ -33,54 +17,21 @@ export async function updateFirstLogin(userId: string) {
 // ---------------------------------------------------------------------------
 
 export async function findHostelsByLandlordIdWithRooms(landlordId: string) {
-  const hostelList = await db
-    .select()
-    .from(hostels)
-    .where(eq(hostels.landlordId, landlordId));
-
-  if (!hostelList.length) return [];
-
-  const roomList = await db
-    .select()
-    .from(rooms)
-    .where(inArray(rooms.hostelId, hostelList.map((h) => h.id)));
-
-  return hostelList.map((hostel) => ({
-    ...hostel,
-    rooms: roomList.filter((r) => r.hostelId === hostel.id),
-  }));
+  return prisma.hostel.findMany({
+    where: { landlordId },
+    include: { rooms: true },
+  });
 }
 
-export async function findHostelByIdWithRooms(
-  hostelId: string,
-  landlordId: string
-) {
-  const [hostel] = await db
-    .select()
-    .from(hostels)
-    .where(and(eq(hostels.id, hostelId), eq(hostels.landlordId, landlordId)))
-    .limit(1);
-
-  if (!hostel) return null;
-
-  const roomList = await db
-    .select()
-    .from(rooms)
-    .where(eq(rooms.hostelId, hostelId));
-
-  return { ...hostel, rooms: roomList };
+export async function findHostelByIdWithRooms(hostelId: string, landlordId: string) {
+  return prisma.hostel.findFirst({
+    where: { id: hostelId, landlordId },
+    include: { rooms: true },
+  });
 }
 
-export async function findHostelByIdAndLandlordId(
-  hostelId: string,
-  landlordId: string
-) {
-  const [hostel] = await db
-    .select()
-    .from(hostels)
-    .where(and(eq(hostels.id, hostelId), eq(hostels.landlordId, landlordId)))
-    .limit(1);
-  return hostel ?? null;
+export async function findHostelByIdAndLandlordId(hostelId: string, landlordId: string) {
+  return prisma.hostel.findFirst({ where: { id: hostelId, landlordId } });
 }
 
 export async function createHostel(
@@ -94,9 +45,8 @@ export async function createHostel(
   },
   imageUrls: string[]
 ) {
-  const [newHostel] = await db
-    .insert(hostels)
-    .values({
+  return prisma.hostel.create({
+    data: {
       landlordId,
       universityId,
       hostelName: data.hostelName,
@@ -104,25 +54,16 @@ export async function createHostel(
       description: data.description,
       images: imageUrls,
       whatsappNumber: data.whatsappNumber,
-    })
-    .returning();
-  return newHostel;
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Rooms
 // ---------------------------------------------------------------------------
 
-export async function findRoomByIdAndHostelId(
-  roomId: string,
-  hostelId: string
-) {
-  const [room] = await db
-    .select()
-    .from(rooms)
-    .where(and(eq(rooms.id, roomId), eq(rooms.hostelId, hostelId)))
-    .limit(1);
-  return room ?? null;
+export async function findRoomByIdAndHostelId(roomId: string, hostelId: string) {
+  return prisma.room.findFirst({ where: { id: roomId, hostelId } });
 }
 
 export async function createRoom(
@@ -133,16 +74,14 @@ export async function createRoom(
     capacity: number;
   }
 ) {
-  const [newRoom] = await db
-    .insert(rooms)
-    .values({
+  return prisma.room.create({
+    data: {
       hostelId,
       roomType: data.roomType,
-      price: String(data.price),
+      price: data.price,
       capacity: data.capacity,
-    })
-    .returning();
-  return newRoom;
+    },
+  });
 }
 
 export async function updateRoomById(
@@ -153,17 +92,14 @@ export async function updateRoomById(
     capacity?: number;
   }
 ) {
-  const [updated] = await db
-    .update(rooms)
-    .set({
+  return prisma.room.update({
+    where: { id: roomId },
+    data: {
       ...(data.roomType !== undefined && { roomType: data.roomType }),
-      ...(data.price !== undefined && { price: String(data.price) }),
+      ...(data.price !== undefined && { price: data.price }),
       ...(data.capacity !== undefined && { capacity: data.capacity }),
-      updatedAt: new Date(),
-    })
-    .where(eq(rooms.id, roomId))
-    .returning();
-  return updated;
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -171,9 +107,8 @@ export async function updateRoomById(
 // ---------------------------------------------------------------------------
 
 export function findNotificationsByUserId(userId: string) {
-  return db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, userId))
-    .orderBy(desc(notifications.createdAt));
+  return prisma.notification.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
 }

@@ -1,9 +1,9 @@
-import type { User } from "../db/schema/users";
+import type { User } from "@prisma/client";
 
 declare global {
   namespace Express {
     interface Request {
-      auth?: {
+      userContext?: {
         clerkId: string;
         role: "admin" | "university" | "landlord" | "student";
         user: User;

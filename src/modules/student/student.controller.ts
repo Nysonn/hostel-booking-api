@@ -46,7 +46,7 @@ export const getUniversities: RequestHandler = async (_req, res, next) => {
 
 export const getHostels: RequestHandler = async (req, res, next) => {
   try {
-    const data = await service.listHostels(req.auth!.user.id);
+    const data = await service.listHostels(req.userContext!.user.id);
     res.json({ success: true, message: "Hostels fetched successfully", data });
   } catch (err) {
     next(err);
@@ -56,7 +56,7 @@ export const getHostels: RequestHandler = async (req, res, next) => {
 export const getHostel: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.getHostel(
-      req.auth!.user.id,
+      req.userContext!.user.id,
       String(req.params.hostelId)
     );
     res.json({ success: true, message: "Hostel fetched successfully", data });
@@ -67,7 +67,7 @@ export const getHostel: RequestHandler = async (req, res, next) => {
 
 export const getNotifications: RequestHandler = async (req, res, next) => {
   try {
-    const data = await service.listNotifications(req.auth!.user.id);
+    const data = await service.listNotifications(req.userContext!.user.id);
     res.json({
       success: true,
       message: "Notifications fetched successfully",

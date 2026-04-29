@@ -2,21 +2,130 @@
   "info": {
     "_postman_id": "b7e2f4a1-3c90-4d58-a812-6f05d9e1c347",
     "name": "Hostel Booking API",
+    "description": "Complete collection for the Hostel Booking API. Set `baseUrl`, `token`, and the ID variables before running requests.\n\n**Typical testing order:**\n1. Health Check\n2. Admin → Create University\n3. University → Reset Password → Register Landlord\n4. Landlord → Reset Password → Create Hostel → Add Room\n5. Student → Register → Get Hostels → Create Booking → Process Payment",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "token",
-      "value": "",
-      "type": "string"
-    }
+    { "key": "baseUrl",        "value": "http://localhost:3000",                          "type": "string" },
+    { "key": "clerkFrontendApi","value": "https://sharp-gazelle-23.clerk.accounts.dev",   "type": "string", "description": "Clerk Frontend API base URL (decoded from CLERK_PUBLISHABLE_KEY)" },
+    { "key": "signInEmail",    "value": "",                                               "type": "string", "description": "Email of the user you want to sign in as" },
+    { "key": "signInPassword", "value": "",                                               "type": "string", "description": "Password for that user" },
+    { "key": "signInId",       "value": "",                                               "type": "string", "description": "Set automatically by Step 1 of the sign-in flow" },
+    { "key": "token",          "value": "",                                               "type": "string", "description": "Clerk session JWT — set automatically by Step 2 of the sign-in flow" },
+    { "key": "userId",         "value": "",                                               "type": "string", "description": "UUID of any non-admin user (for suspend/unsuspend/delete)" },
+    { "key": "universityId",   "value": "",                                               "type": "string", "description": "UUID returned when a university is created" },
+    { "key": "hostelId",       "value": "",                                               "type": "string", "description": "UUID returned when a hostel is created" },
+    { "key": "roomId",         "value": "",                                               "type": "string", "description": "UUID returned when a room is added" },
+    { "key": "bookingId",      "value": "",                                               "type": "string", "description": "UUID returned when a booking is created" }
   ],
   "item": [
+    {
+      "name": "Auth (Get Token)",
+      "description": "Two-step Clerk sign-in flow. Fill in `signInEmail` and `signInPassword` in the collection variables, run Step 1 then Step 2. The `token` variable is set automatically after Step 2 — every protected request will then work.",
+      "item": [
+        {
+          "name": "Step 1 — Create Sign-In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const id = body?.response?.id;",
+                  "if (id) {",
+                  "    pm.collectionVariables.set('signInId', id);",
+                  "    console.log('signInId set:', id);",
+                  "} else {",
+                  "    console.error('Could not find sign-in id in response', JSON.stringify(body));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Initiates a Clerk sign-in. Sends the user's email as the identifier. On success the `signInId` variable is set automatically.\n\nDo **not** change the Content-Type — Clerk's Frontend API requires `application/x-www-form-urlencoded` here.",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "identifier", "value": "{{signInEmail}}", "description": "Set signInEmail in collection variables" }
+              ]
+            },
+            "url": {
+              "raw": "{{clerkFrontendApi}}/v1/client/sign_ins",
+              "host": ["{{clerkFrontendApi}}"],
+              "path": ["v1", "client", "sign_ins"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 — needs_first_factor",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"response\": {\n    \"id\": \"si_2abc123xyz\",\n    \"status\": \"needs_first_factor\",\n    \"identifier\": \"admin@mak.ac.ug\",\n    \"supported_first_factors\": [\n      { \"strategy\": \"password\" }\n    ]\n  },\n  \"client\": { \"sessions\": [] }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Step 2 — Attempt Password (gets JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "// Clerk returns the JWT inside client.sessions[0].last_active_token.jwt",
+                  "const sessions = body?.client?.sessions;",
+                  "if (sessions && sessions.length > 0) {",
+                  "    const jwt = sessions[0]?.last_active_token?.jwt;",
+                  "    if (jwt) {",
+                  "        pm.collectionVariables.set('token', jwt);",
+                  "        console.log('token set — first 40 chars:', jwt.substring(0, 40));",
+                  "    } else {",
+                  "        console.error('JWT not found in session', JSON.stringify(sessions[0]));",
+                  "    }",
+                  "} else {",
+                  "    console.error('No sessions in response', JSON.stringify(body));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Submits the password for the sign-in started in Step 1. On success the `token` variable is set to the Clerk session JWT automatically — all `Authorization: Bearer {{token}}` requests in this collection will now work.",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "strategy", "value": "password" },
+                { "key": "password", "value": "{{signInPassword}}", "description": "Set signInPassword in collection variables" }
+              ]
+            },
+            "url": {
+              "raw": "{{clerkFrontendApi}}/v1/client/sign_ins/{{signInId}}/attempt_first_factor",
+              "host": ["{{clerkFrontendApi}}"],
+              "path": ["v1", "client", "sign_ins", "{{signInId}}", "attempt_first_factor"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 — complete (token extracted)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"response\": {\n    \"id\": \"si_2abc123xyz\",\n    \"status\": \"complete\",\n    \"created_session_id\": \"sess_2xyz456\"\n  },\n  \"client\": {\n    \"sessions\": [\n      {\n        \"id\": \"sess_2xyz456\",\n        \"status\": \"active\",\n        \"last_active_token\": {\n          \"jwt\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...<the token that gets saved to {{token}}>\"\n        }\n      }\n    ]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Health",
       "item": [
@@ -25,26 +134,36 @@
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Liveness check. No auth required.",
             "url": {
               "raw": "{{baseUrl}}/api/health",
               "host": ["{{baseUrl}}"],
               "path": ["api", "health"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"API is running\",\n  \"timestamp\": \"2026-04-27T10:00:00.000Z\"\n}"
+            }
+          ]
         }
       ]
     },
     {
       "name": "Admin",
+      "description": "All routes require a valid admin Bearer token.",
       "item": [
         {
           "name": "Get All Users",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all non-admin users. Use the optional `role` query param to filter.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/users",
               "host": ["{{baseUrl}}"],
@@ -53,58 +172,91 @@
                 {
                   "key": "role",
                   "value": "student",
-                  "description": "Optional. Filter by role: university | landlord | student",
+                  "description": "university | landlord | student",
                   "disabled": true
                 }
               ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Users fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"clerk_user_id\": \"user_2abc123\",\n      \"role\": \"student\",\n      \"is_suspended\": false,\n      \"created_at\": \"2026-04-20T08:30:00.000Z\"\n    },\n    {\n      \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n      \"clerk_user_id\": \"user_2def456\",\n      \"role\": \"landlord\",\n      \"is_suspended\": false,\n      \"created_at\": \"2026-04-18T12:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get All Universities",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all universities in the system.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/universities",
               "host": ["{{baseUrl}}"],
               "path": ["api", "admin", "universities"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Universities fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n      \"university_name\": \"Makerere University\",\n      \"location\": \"Kampala, Uganda\",\n      \"type\": \"government\",\n      \"email\": \"admin@mak.ac.ug\",\n      \"first_login\": true,\n      \"created_at\": \"2026-04-15T09:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get All Landlords",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all landlords with their affiliated university.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/landlords",
               "host": ["{{baseUrl}}"],
               "path": ["api", "admin", "landlords"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Landlords fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n      \"full_name\": \"Ssemakula Robert\",\n      \"gender\": \"male\",\n      \"whatsapp_number\": \"+256700123456\",\n      \"first_login\": false,\n      \"university\": {\n        \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n        \"university_name\": \"Makerere University\"\n      },\n      \"created_at\": \"2026-04-18T10:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get All Students",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all students with their affiliated university.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/students",
               "host": ["{{baseUrl}}"],
               "path": ["api", "admin", "students"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Students fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"e5f6a7b8-c9d0-1234-efab-345678901234\",\n      \"registration_number\": \"2024/BCS/001\",\n      \"surname\": \"Nakato\",\n      \"other_names\": \"Patricia\",\n      \"gender\": \"female\",\n      \"student_email\": \"patricia.nakato@students.mak.ac.ug\",\n      \"first_login\": false,\n      \"university\": {\n        \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n        \"university_name\": \"Makerere University\"\n      },\n      \"created_at\": \"2026-04-20T08:30:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Create University",
@@ -114,12 +266,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Creates a university account in Clerk and the local DB. Sends a welcome email with login credentials.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"university_name\": \"University of Lagos\",\n  \"location\": \"Lagos, Nigeria\",\n  \"type\": \"government\",\n  \"email\": \"admin@unilag.edu.ng\",\n  \"password\": \"SecurePass123!\"\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "raw": "{\n  \"university_name\": \"Makerere University\",\n  \"location\": \"Kampala, Uganda\",\n  \"type\": \"government\",\n  \"email\": \"admin@mak.ac.ug\",\n  \"password\": \"MakUni2026!@\"\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/admin/universities",
@@ -127,57 +278,107 @@
               "path": ["api", "admin", "universities"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"University created successfully\",\n  \"data\": {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"university_name\": \"Makerere University\",\n    \"location\": \"Kampala, Uganda\",\n    \"type\": \"government\",\n    \"email\": \"admin@mak.ac.ug\",\n    \"first_login\": true,\n    \"created_at\": \"2026-04-27T10:05:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "400 Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Validation failed\",\n  \"errors\": [\n    { \"field\": \"email\", \"message\": \"Invalid email\" }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Suspend User",
           "request": {
             "method": "PATCH",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Sets `is_suspended = true` in the DB and bans the user in Clerk so they cannot obtain new sessions.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/users/{{userId}}/suspend",
               "host": ["{{baseUrl}}"],
               "path": ["api", "admin", "users", "{{userId}}", "suspend"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"User suspended successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Unsuspend User",
           "request": {
             "method": "PATCH",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Clears the suspension flag in the DB and unbans the user in Clerk.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/users/{{userId}}/unsuspend",
               "host": ["{{baseUrl}}"],
               "path": ["api", "admin", "users", "{{userId}}", "unsuspend"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"User unsuspended successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Delete User",
           "request": {
             "method": "DELETE",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Deletes a user and all associated data from both the DB and Clerk. Cannot target the admin account.",
             "url": {
               "raw": "{{baseUrl}}/api/admin/users/{{userId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "admin", "users", "{{userId}}"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"User deleted successfully\"\n}"
+            },
+            {
+              "name": "403 Cannot Delete Admin",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete the admin account\"\n}"
+            }
+          ]
         }
       ]
     },
     {
       "name": "University",
+      "description": "Routes for university accounts. Auth/logout routes do not require a suspension check.",
       "item": [
         {
           "name": "Reset Password",
@@ -187,12 +388,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Changes the university account password and clears the `first_login` flag.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"new_password\": \"NewSecurePass123!\"\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "raw": "{\n  \"new_password\": \"NewMakUni2026!@\"\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/university/auth/reset-password",
@@ -200,41 +400,57 @@
               "path": ["api", "university", "auth", "reset-password"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password reset successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Revokes the current Clerk session.",
             "url": {
               "raw": "{{baseUrl}}/api/university/auth/logout",
               "host": ["{{baseUrl}}"],
               "path": ["api", "university", "auth", "logout"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Register Landlord",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Creates a landlord account. Accepts multipart/form-data. `ownership_documents` accepts up to 10 files (max 10 MB each).",
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "full_name", "value": "Emeka Okafor", "type": "text" },
-                { "key": "gender", "value": "male", "type": "text" },
-                { "key": "nin", "value": "12345678901", "type": "text" },
-                { "key": "marital_status", "value": "married", "type": "text" },
-                { "key": "whatsapp_number", "value": "+2348012345678", "type": "text" },
-                { "key": "email", "value": "emeka@landlord.com", "type": "text" },
-                { "key": "password", "value": "TempPass123!", "type": "text" },
-                { "key": "ownership_documents", "type": "file", "src": [] }
+                { "key": "full_name",            "value": "Ssemakula Robert",   "type": "text" },
+                { "key": "gender",               "value": "male",               "type": "text" },
+                { "key": "nin",                  "value": "CM9200000123456",    "type": "text" },
+                { "key": "marital_status",       "value": "married",            "type": "text" },
+                { "key": "whatsapp_number",      "value": "+256700123456",      "type": "text" },
+                { "key": "email",                "value": "ssemakula@landlord.ug", "type": "text" },
+                { "key": "password",             "value": "TempLand2026!",      "type": "text" },
+                { "key": "ownership_documents",  "type": "file", "src": [],     "description": "One or more document files" }
               ]
             },
             "url": {
@@ -243,57 +459,91 @@
               "path": ["api", "university", "landlords"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Landlord registered successfully\",\n  \"data\": {\n    \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"full_name\": \"Ssemakula Robert\",\n    \"gender\": \"male\",\n    \"nin\": \"CM9200000123456\",\n    \"marital_status\": \"married\",\n    \"whatsapp_number\": \"+256700123456\",\n    \"ownership_documents\": [\n      \"https://res.cloudinary.com/demo/image/upload/v1/ownership/doc1.pdf\"\n    ],\n    \"first_login\": true,\n    \"created_at\": \"2026-04-27T10:15:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Landlords",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all landlords registered under this university.",
             "url": {
               "raw": "{{baseUrl}}/api/university/landlords",
               "host": ["{{baseUrl}}"],
               "path": ["api", "university", "landlords"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Landlords fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n      \"full_name\": \"Ssemakula Robert\",\n      \"gender\": \"male\",\n      \"whatsapp_number\": \"+256700123456\",\n      \"first_login\": false,\n      \"created_at\": \"2026-04-18T10:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get Students",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all students registered under this university.",
             "url": {
               "raw": "{{baseUrl}}/api/university/students",
               "host": ["{{baseUrl}}"],
               "path": ["api", "university", "students"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Students fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"e5f6a7b8-c9d0-1234-efab-345678901234\",\n      \"registration_number\": \"2024/BCS/001\",\n      \"surname\": \"Nakato\",\n      \"other_names\": \"Patricia\",\n      \"gender\": \"female\",\n      \"student_email\": \"patricia.nakato@students.mak.ac.ug\",\n      \"first_login\": false,\n      \"created_at\": \"2026-04-20T08:30:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get Hostels",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all hostels associated with this university (via its landlords).",
             "url": {
               "raw": "{{baseUrl}}/api/university/hostels",
               "host": ["{{baseUrl}}"],
               "path": ["api", "university", "hostels"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Hostels fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n      \"hostel_name\": \"Katanga View Hostel\",\n      \"location\": \"Katanga, Kampala\",\n      \"description\": \"Secure hostel 5 minutes from the main gate.\",\n      \"whatsapp_number\": \"+256700123456\",\n      \"images\": [\n        \"https://res.cloudinary.com/demo/image/upload/v1/hostels/katanga1.jpg\"\n      ],\n      \"created_at\": \"2026-04-20T09:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
     {
       "name": "Landlord",
+      "description": "Routes for landlord accounts. Auth/logout routes do not require a suspension check.",
       "item": [
         {
           "name": "Reset Password",
@@ -303,12 +553,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Changes the landlord password and clears the `first_login` flag.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"new_password\": \"NewSecurePass123!\"\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "raw": "{\n  \"new_password\": \"NewLand2026!@\"\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/landlord/auth/reset-password",
@@ -316,38 +565,54 @@
               "path": ["api", "landlord", "auth", "reset-password"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password reset successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Revokes the current Clerk session.",
             "url": {
               "raw": "{{baseUrl}}/api/landlord/auth/logout",
               "host": ["{{baseUrl}}"],
               "path": ["api", "landlord", "auth", "logout"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Create Hostel",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Creates a hostel. Accepts multipart/form-data. `images` accepts up to 10 files (max 10 MB each).",
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "hostel_name", "value": "Palm Court Hostel", "type": "text" },
-                { "key": "location", "value": "15 University Road, Akoka", "type": "text" },
-                { "key": "description", "value": "A clean and secure hostel close to campus.", "type": "text" },
-                { "key": "whatsapp_number", "value": "+2348012345678", "type": "text" },
-                { "key": "images", "type": "file", "src": [] }
+                { "key": "hostel_name",     "value": "Katanga View Hostel",                         "type": "text" },
+                { "key": "location",        "value": "Katanga, Kampala",                            "type": "text" },
+                { "key": "description",     "value": "Secure hostel 5 minutes from the main gate.", "type": "text" },
+                { "key": "whatsapp_number", "value": "+256700123456",                               "type": "text" },
+                { "key": "images",          "type": "file", "src": [],                              "description": "One or more hostel image files" }
               ]
             },
             "url": {
@@ -356,37 +621,70 @@
               "path": ["api", "landlord", "hostels"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Hostel created successfully\",\n  \"data\": {\n    \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n    \"hostel_name\": \"Katanga View Hostel\",\n    \"location\": \"Katanga, Kampala\",\n    \"description\": \"Secure hostel 5 minutes from the main gate.\",\n    \"whatsapp_number\": \"+256700123456\",\n    \"images\": [\n      \"https://res.cloudinary.com/demo/image/upload/v1/hostels/katanga1.jpg\"\n    ],\n    \"created_at\": \"2026-04-27T10:20:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get All Hostels",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all hostels belonging to the authenticated landlord, with their rooms.",
             "url": {
               "raw": "{{baseUrl}}/api/landlord/hostels",
               "host": ["{{baseUrl}}"],
               "path": ["api", "landlord", "hostels"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Hostels fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n      \"hostel_name\": \"Katanga View Hostel\",\n      \"location\": \"Katanga, Kampala\",\n      \"description\": \"Secure hostel 5 minutes from the main gate.\",\n      \"whatsapp_number\": \"+256700123456\",\n      \"images\": [\"https://res.cloudinary.com/demo/image/upload/v1/hostels/katanga1.jpg\"],\n      \"rooms\": [\n        {\n          \"id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n          \"room_type\": \"single_self_contained\",\n          \"price\": \"350000\",\n          \"capacity\": 1,\n          \"occupied_slots\": 0,\n          \"is_available\": true\n        }\n      ],\n      \"created_at\": \"2026-04-27T10:20:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get Single Hostel",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns a single hostel with full room details.",
             "url": {
               "raw": "{{baseUrl}}/api/landlord/hostels/{{hostelId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "landlord", "hostels", "{{hostelId}}"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Hostel fetched successfully\",\n  \"data\": {\n    \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n    \"hostel_name\": \"Katanga View Hostel\",\n    \"location\": \"Katanga, Kampala\",\n    \"description\": \"Secure hostel 5 minutes from the main gate.\",\n    \"whatsapp_number\": \"+256700123456\",\n    \"images\": [\"https://res.cloudinary.com/demo/image/upload/v1/hostels/katanga1.jpg\"],\n    \"rooms\": [\n      {\n        \"id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n        \"room_type\": \"single_self_contained\",\n        \"price\": \"350000\",\n        \"capacity\": 1,\n        \"occupied_slots\": 0,\n        \"is_available\": true\n      },\n      {\n        \"id\": \"b8c9d0e1-f2a3-4567-bcde-678901234567\",\n        \"room_type\": \"double_self_contained\",\n        \"price\": \"500000\",\n        \"capacity\": 2,\n        \"occupied_slots\": 1,\n        \"is_available\": true\n      }\n    ],\n    \"created_at\": \"2026-04-27T10:20:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Hostel not found\"\n}"
+            }
+          ]
         },
         {
           "name": "Add Room to Hostel",
@@ -396,12 +694,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Adds a room to an existing hostel. `room_type` must be `single_self_contained` or `double_self_contained`.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"room_type\": \"single_self_contained\",\n  \"price\": 150000,\n  \"capacity\": 1\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "raw": "{\n  \"room_type\": \"single_self_contained\",\n  \"price\": 350000,\n  \"capacity\": 1\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/landlord/hostels/{{hostelId}}/rooms",
@@ -409,7 +706,16 @@
               "path": ["api", "landlord", "hostels", "{{hostelId}}", "rooms"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Room added successfully\",\n  \"data\": {\n    \"id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n    \"hostel_id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n    \"room_type\": \"single_self_contained\",\n    \"price\": \"350000\",\n    \"capacity\": 1,\n    \"occupied_slots\": 0,\n    \"is_available\": true,\n    \"created_at\": \"2026-04-27T10:25:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Update Room",
@@ -419,12 +725,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Partially updates room details. All fields are optional.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"room_type\": \"double_self_contained\",\n  \"price\": 200000,\n  \"capacity\": 2\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "raw": "{\n  \"room_type\": \"double_self_contained\",\n  \"price\": 500000,\n  \"capacity\": 2\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/landlord/hostels/{{hostelId}}/rooms/{{roomId}}",
@@ -432,54 +737,79 @@
               "path": ["api", "landlord", "hostels", "{{hostelId}}", "rooms", "{{roomId}}"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Room updated successfully\",\n  \"data\": {\n    \"id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n    \"hostel_id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n    \"room_type\": \"double_self_contained\",\n    \"price\": \"500000\",\n    \"capacity\": 2,\n    \"occupied_slots\": 0,\n    \"is_available\": true,\n    \"created_at\": \"2026-04-27T10:25:00.000Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Notifications",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all notifications for the landlord, newest first.",
             "url": {
               "raw": "{{baseUrl}}/api/landlord/notifications",
               "host": ["{{baseUrl}}"],
               "path": ["api", "landlord", "notifications"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Notifications fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"c9d0e1f2-a3b4-5678-cdef-789012345678\",\n      \"title\": \"New Booking\",\n      \"message\": \"Patricia Nakato has booked Room 101 in Katanga View Hostel.\",\n      \"created_at\": \"2026-04-27T11:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
     {
       "name": "Student",
+      "description": "Public registration and auth routes, plus protected hostel browsing and notifications.",
       "item": [
         {
           "name": "List Universities (Public)",
           "request": {
             "method": "GET",
             "header": [],
+            "description": "Public endpoint. Returns all universities for use in the student registration dropdown.",
             "url": {
               "raw": "{{baseUrl}}/api/student/universities",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "universities"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Universities fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n      \"university_name\": \"Makerere University\",\n      \"location\": \"Kampala, Uganda\",\n      \"type\": \"government\"\n    },\n    {\n      \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890abc\",\n      \"university_name\": \"Kyambogo University\",\n      \"location\": \"Kampala, Uganda\",\n      \"type\": \"government\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Register",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "description": "Public endpoint. Self-registers a student. `university_id` must be a valid UUID from the universities list.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"registration_number\": \"200401001\",\n  \"surname\": \"Adeyemi\",\n  \"other_names\": \"Kehinde James\",\n  \"gender\": \"male\",\n  \"student_email\": \"kehinde@student.edu.ng\",\n  \"password\": \"SecurePass123!\",\n  \"university_id\": \"{{universityId}}\"\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "raw": "{\n  \"registration_number\": \"2024/BCS/001\",\n  \"surname\": \"Nakato\",\n  \"other_names\": \"Patricia\",\n  \"gender\": \"female\",\n  \"student_email\": \"patricia.nakato@students.mak.ac.ug\",\n  \"password\": \"Student2026!@\",\n  \"university_id\": \"{{universityId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/student/auth/register",
@@ -487,72 +817,122 @@
               "path": ["api", "student", "auth", "register"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Student registered successfully\",\n  \"data\": {\n    \"id\": \"e5f6a7b8-c9d0-1234-efab-345678901234\",\n    \"registration_number\": \"2024/BCS/001\",\n    \"surname\": \"Nakato\",\n    \"other_names\": \"Patricia\",\n    \"gender\": \"female\",\n    \"student_email\": \"patricia.nakato@students.mak.ac.ug\",\n    \"university_id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"first_login\": false,\n    \"created_at\": \"2026-04-27T10:30:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "409 Already Registered",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"A student with this registration number already exists\"\n}"
+            }
+          ]
         },
         {
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Revokes the current Clerk session.",
             "url": {
               "raw": "{{baseUrl}}/api/student/auth/logout",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "auth", "logout"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
         },
         {
           "name": "Get Hostels (University-scoped)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all hostels in the student's university. Scoped automatically from the token.",
             "url": {
               "raw": "{{baseUrl}}/api/student/hostels",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "hostels"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Hostels fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n      \"hostel_name\": \"Katanga View Hostel\",\n      \"location\": \"Katanga, Kampala\",\n      \"description\": \"Secure hostel 5 minutes from the main gate.\",\n      \"whatsapp_number\": \"+256700123456\",\n      \"images\": [\"https://res.cloudinary.com/demo/image/upload/v1/hostels/katanga1.jpg\"],\n      \"available_rooms\": 2,\n      \"created_at\": \"2026-04-27T10:20:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get Single Hostel",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns a single hostel with room availability details.",
             "url": {
               "raw": "{{baseUrl}}/api/student/hostels/{{hostelId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "hostels", "{{hostelId}}"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Hostel fetched successfully\",\n  \"data\": {\n    \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n    \"hostel_name\": \"Katanga View Hostel\",\n    \"location\": \"Katanga, Kampala\",\n    \"description\": \"Secure hostel 5 minutes from the main gate.\",\n    \"whatsapp_number\": \"+256700123456\",\n    \"images\": [\"https://res.cloudinary.com/demo/image/upload/v1/hostels/katanga1.jpg\"],\n    \"rooms\": [\n      {\n        \"id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n        \"room_type\": \"single_self_contained\",\n        \"price\": \"350000\",\n        \"capacity\": 1,\n        \"occupied_slots\": 0,\n        \"is_available\": true\n      },\n      {\n        \"id\": \"b8c9d0e1-f2a3-4567-bcde-678901234567\",\n        \"room_type\": \"double_self_contained\",\n        \"price\": \"500000\",\n        \"capacity\": 2,\n        \"occupied_slots\": 2,\n        \"is_available\": false\n      }\n    ]\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Notifications",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all notifications for the student, newest first.",
             "url": {
               "raw": "{{baseUrl}}/api/student/notifications",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "notifications"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Notifications fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"d0e1f2a3-b4c5-6789-defa-890123456789\",\n      \"title\": \"Booking Confirmed\",\n      \"message\": \"Your booking for Room 101 at Katanga View Hostel has been confirmed.\",\n      \"created_at\": \"2026-04-27T11:00:00.000Z\"\n    },\n    {\n      \"id\": \"e1f2a3b4-c5d6-7890-efab-901234567890\",\n      \"title\": \"Payment Received\",\n      \"message\": \"Your partial payment of UGX 175,000 has been received.\",\n      \"created_at\": \"2026-04-27T11:05:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
     {
       "name": "Booking",
+      "description": "All booking routes require a student token and an active (non-suspended) account.",
       "item": [
         {
           "name": "Create Booking",
@@ -562,12 +942,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Books an available room. A student may hold only one active booking at a time. `room_id` must be a valid UUID.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"room_id\": \"{{roomId}}\"\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/student/bookings",
@@ -575,57 +954,123 @@
               "path": ["api", "student", "bookings"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Booking created successfully\",\n  \"data\": {\n    \"id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n    \"student_id\": \"e5f6a7b8-c9d0-1234-efab-345678901234\",\n    \"room_id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n    \"status\": \"active\",\n    \"created_at\": \"2026-04-27T11:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "400 Room Not Available",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"This room is no longer available\"\n}"
+            },
+            {
+              "name": "409 Active Booking Exists",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You already have an active booking\"\n}"
+            }
+          ]
         },
         {
           "name": "Get All Bookings",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all bookings (active and terminated) for the authenticated student.",
             "url": {
               "raw": "{{baseUrl}}/api/student/bookings",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "bookings"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Bookings fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n      \"room_id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n      \"status\": \"active\",\n      \"created_at\": \"2026-04-27T11:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get Single Booking",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns a single booking with room and hostel details.",
             "url": {
               "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "bookings", "{{bookingId}}"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Booking fetched successfully\",\n  \"data\": {\n    \"id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n    \"status\": \"active\",\n    \"room\": {\n      \"id\": \"a7b8c9d0-e1f2-3456-abcd-567890123456\",\n      \"room_type\": \"single_self_contained\",\n      \"price\": \"350000\",\n      \"hostel\": {\n        \"id\": \"f6a7b8c9-d0e1-2345-fabc-456789012345\",\n        \"hostel_name\": \"Katanga View Hostel\",\n        \"location\": \"Katanga, Kampala\",\n        \"whatsapp_number\": \"+256700123456\"\n      }\n    },\n    \"created_at\": \"2026-04-27T11:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Booking not found\"\n}"
+            }
+          ]
         },
         {
           "name": "Terminate Booking",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Terminates an active booking. Decrements `occupied_slots` and restores room availability if it was full.",
             "url": {
               "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}/terminate",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "bookings", "{{bookingId}}", "terminate"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Booking terminated successfully\"\n}"
+            },
+            {
+              "name": "400 Already Terminated",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Booking is already terminated\"\n}"
+            }
+          ]
         }
       ]
     },
     {
       "name": "Payment",
+      "description": "All payment routes require a student token and an active (non-suspended) account.",
       "item": [
         {
           "name": "Process Payment",
@@ -635,12 +1080,11 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
+            "description": "Records a payment for a booking. `partial` pays 50% of the room price (allowed once). `full` pays 100%. No further payments accepted once a full payment exists.\n\n`payment_method`: `mtn_mobile_money` | `airtel_mobile_money`\n`payment_type`: `partial` | `full`",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"payment_method\": \"mtn_mobile_money\",\n  \"payment_type\": \"partial\"\n}",
-              "options": {
-                "raw": { "language": "json" }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}/payments",
@@ -648,22 +1092,63 @@
               "path": ["api", "student", "bookings", "{{bookingId}}", "payments"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created — Partial",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment processed successfully\",\n  \"data\": {\n    \"id\": \"a3b4c5d6-e7f8-9012-abcd-123456789012\",\n    \"booking_id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n    \"amount\": \"175000.00\",\n    \"payment_method\": \"mtn_mobile_money\",\n    \"payment_type\": \"partial\",\n    \"created_at\": \"2026-04-27T11:05:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "201 Created — Full",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment processed successfully\",\n  \"data\": {\n    \"id\": \"b4c5d6e7-f8a9-0123-bcde-234567890123\",\n    \"booking_id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n    \"amount\": \"350000.00\",\n    \"payment_method\": \"airtel_mobile_money\",\n    \"payment_type\": \"full\",\n    \"created_at\": \"2026-04-27T11:10:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "400 Already Paid",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"A full payment already exists for this booking\"\n}"
+            },
+            {
+              "name": "400 Partial Already Used",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"A partial payment has already been made for this booking\"\n}"
+            }
+          ]
         },
         {
           "name": "Get Payments for Booking",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Returns all payments made against a specific booking.",
             "url": {
               "raw": "{{baseUrl}}/api/student/bookings/{{bookingId}}/payments",
               "host": ["{{baseUrl}}"],
               "path": ["api", "student", "bookings", "{{bookingId}}", "payments"]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payments fetched successfully\",\n  \"data\": [\n    {\n      \"id\": \"a3b4c5d6-e7f8-9012-abcd-123456789012\",\n      \"booking_id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n      \"amount\": \"175000.00\",\n      \"payment_method\": \"mtn_mobile_money\",\n      \"payment_type\": \"partial\",\n      \"created_at\": \"2026-04-27T11:05:00.000Z\"\n    },\n    {\n      \"id\": \"b4c5d6e7-f8a9-0123-bcde-234567890123\",\n      \"booking_id\": \"f2a3b4c5-d6e7-8901-fabc-012345678901\",\n      \"amount\": \"175000.00\",\n      \"payment_method\": \"airtel_mobile_money\",\n      \"payment_type\": \"full\",\n      \"created_at\": \"2026-04-27T11:10:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     }

@@ -29,32 +29,34 @@ function studentFullName(ctx: BookingContext) {
 // Side effects are non-blocking — booking/termination succeeds regardless
 function fireBookingCreatedSideEffects(ctx: BookingContext) {
   const studentName = studentFullName(ctx);
+  const hostel = ctx.room.hostel;
+  const landlord = ctx.room.hostel.landlord;
 
   Promise.allSettled([
     sendBookingConfirmationEmail({
       to: ctx.student.studentEmail,
       studentName,
-      hostelName: ctx.hostel.hostelName,
+      hostelName: hostel.hostelName,
       roomType: ctx.room.roomType,
-      price: ctx.room.price,
+      price: ctx.room.price.toString(),
     }),
     sendBookingNotificationToLandlord({
-      to: ctx.landlord.email,
-      landlordName: ctx.landlord.fullName,
+      to: landlord.email,
+      landlordName: landlord.fullName,
       studentName,
-      hostelName: ctx.hostel.hostelName,
+      hostelName: hostel.hostelName,
       roomType: ctx.room.roomType,
     }),
     createNotification({
       userId: ctx.student.userId,
       title: "Booking Confirmed",
-      body: `Your booking for a ${ctx.room.roomType} room at ${ctx.hostel.hostelName} has been confirmed.`,
+      body: `Your booking for a ${ctx.room.roomType} room at ${hostel.hostelName} has been confirmed.`,
       type: "booking",
     }),
     createNotification({
-      userId: ctx.landlord.userId,
+      userId: landlord.userId,
       title: "New Booking",
-      body: `${studentName} has booked a ${ctx.room.roomType} room at ${ctx.hostel.hostelName}.`,
+      body: `${studentName} has booked a ${ctx.room.roomType} room at ${hostel.hostelName}.`,
       type: "booking",
     }),
   ]).catch((err) => console.error("Booking side effects error:", err));
@@ -62,31 +64,33 @@ function fireBookingCreatedSideEffects(ctx: BookingContext) {
 
 function fireTerminationSideEffects(ctx: BookingContext) {
   const studentName = studentFullName(ctx);
+  const hostel = ctx.room.hostel;
+  const landlord = ctx.room.hostel.landlord;
 
   Promise.allSettled([
     sendTerminationConfirmationEmail({
       to: ctx.student.studentEmail,
       studentName,
-      hostelName: ctx.hostel.hostelName,
+      hostelName: hostel.hostelName,
       roomType: ctx.room.roomType,
     }),
     sendTerminationNotificationToLandlord({
-      to: ctx.landlord.email,
-      landlordName: ctx.landlord.fullName,
+      to: landlord.email,
+      landlordName: landlord.fullName,
       studentName,
-      hostelName: ctx.hostel.hostelName,
+      hostelName: hostel.hostelName,
       roomType: ctx.room.roomType,
     }),
     createNotification({
       userId: ctx.student.userId,
       title: "Booking Terminated",
-      body: `Your booking at ${ctx.hostel.hostelName} has been terminated.`,
+      body: `Your booking at ${hostel.hostelName} has been terminated.`,
       type: "termination",
     }),
     createNotification({
-      userId: ctx.landlord.userId,
+      userId: landlord.userId,
       title: "Booking Terminated",
-      body: `${studentName} has terminated their booking at ${ctx.hostel.hostelName}.`,
+      body: `${studentName} has terminated their booking at ${hostel.hostelName}.`,
       type: "termination",
     }),
   ]).catch((err) => console.error("Termination side effects error:", err));

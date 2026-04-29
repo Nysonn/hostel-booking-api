@@ -19,6 +19,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+RUN npx prisma generate
 
 CMD ["npx", "nodemon", "--watch", "src", "--ext", "ts", "--exec", "tsx src/index.ts"]
 

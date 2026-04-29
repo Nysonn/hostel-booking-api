@@ -4,7 +4,7 @@ import * as service from "./payment.service";
 export const createPayment: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.processBookingPayment(
-      req.auth!.user.id,
+      req.userContext!.user.id,
       String(req.params.bookingId),
       req.body as import("./payment.schema").CreatePaymentInput
     );
@@ -21,7 +21,7 @@ export const createPayment: RequestHandler = async (req, res, next) => {
 export const getPayments: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.listPayments(
-      req.auth!.user.id,
+      req.userContext!.user.id,
       String(req.params.bookingId)
     );
     res.json({

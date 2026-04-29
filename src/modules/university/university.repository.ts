@@ -1,53 +1,30 @@
-import { eq } from "drizzle-orm";
-import { db } from "../../db";
-import {
-  hostels,
-  landlords,
-  students,
-  universities,
-  users,
-} from "../../db/schema";
+import { prisma } from "../../db";
 
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
 export async function findUniversityByUserId(userId: string) {
-  const [univ] = await db
-    .select()
-    .from(universities)
-    .where(eq(universities.userId, userId))
-    .limit(1);
-  return univ ?? null;
+  return prisma.university.findUnique({ where: { userId } });
 }
 
 export function findLandlordsByUniversityId(universityId: string) {
-  return db
-    .select()
-    .from(landlords)
-    .where(eq(landlords.universityId, universityId));
+  return prisma.landlord.findMany({ where: { universityId } });
 }
 
 export function findStudentsByUniversityId(universityId: string) {
-  return db
-    .select()
-    .from(students)
-    .where(eq(students.universityId, universityId));
+  return prisma.student.findMany({ where: { universityId } });
 }
 
 export function findHostelsByUniversityId(universityId: string) {
-  return db
-    .select()
-    .from(hostels)
-    .where(eq(hostels.universityId, universityId));
+  return prisma.hostel.findMany({ where: { universityId } });
 }
 
 export async function isLandlordCodeUnique(code: string): Promise<boolean> {
-  const [existing] = await db
-    .select({ id: landlords.id })
-    .from(landlords)
-    .where(eq(landlords.landlordCode, code))
-    .limit(1);
+  const existing = await prisma.landlord.findUnique({
+    where: { landlordCode: code },
+    select: { id: true },
+  });
   return !existing;
 }
 
@@ -56,10 +33,7 @@ export async function isLandlordCodeUnique(code: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 export async function updateFirstLogin(userId: string) {
-  await db
-    .update(users)
-    .set({ firstLogin: false, updatedAt: new Date() })
-    .where(eq(users.id, userId));
+  await prisma.user.update({ where: { id: userId }, data: { firstLogin: false } });
 }
 
 export async function createUserAndLandlord(
@@ -76,15 +50,13 @@ export async function createUserAndLandlord(
   },
   documentUrls: string[]
 ) {
-  return db.transaction(async (tx) => {
-    const [newUser] = await tx
-      .insert(users)
-      .values({ clerkId, role: "landlord" })
-      .returning();
+  return prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: { clerkId, role: "landlord" },
+    });
 
-    const [newLandlord] = await tx
-      .insert(landlords)
-      .values({
+    const newLandlord = await tx.landlord.create({
+      data: {
         userId: newUser.id,
         universityId,
         fullName: data.fullName,
@@ -95,8 +67,8 @@ export async function createUserAndLandlord(
         landlordCode: data.landlordCode,
         whatsappNumber: data.whatsappNumber,
         email: data.email,
-      })
-      .returning();
+      },
+    });
 
     return { user: newUser, landlord: newLandlord };
   });

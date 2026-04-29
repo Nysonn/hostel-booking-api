@@ -1,13 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { db } from "../../db";
-import {
-  hostels,
-  notifications,
-  rooms,
-  students,
-  universities,
-  users,
-} from "../../db/schema";
+import { prisma } from "../../db";
 import type { RegisterStudentInput } from "./student.schema";
 
 // ---------------------------------------------------------------------------
@@ -15,18 +6,11 @@ import type { RegisterStudentInput } from "./student.schema";
 // ---------------------------------------------------------------------------
 
 export function findAllUniversitiesPublic() {
-  return db
-    .select({ id: universities.id, universityName: universities.universityName })
-    .from(universities);
+  return prisma.university.findMany({ select: { id: true, universityName: true } });
 }
 
 export async function findUniversityById(universityId: string) {
-  const [univ] = await db
-    .select()
-    .from(universities)
-    .where(eq(universities.id, universityId))
-    .limit(1);
-  return univ ?? null;
+  return prisma.university.findUnique({ where: { id: universityId } });
 }
 
 // ---------------------------------------------------------------------------
@@ -34,55 +18,35 @@ export async function findUniversityById(universityId: string) {
 // ---------------------------------------------------------------------------
 
 export async function findStudentByUserId(userId: string) {
-  const [student] = await db
-    .select()
-    .from(students)
-    .where(eq(students.userId, userId))
-    .limit(1);
-  return student ?? null;
+  return prisma.student.findUnique({ where: { userId } });
 }
 
-export async function findStudentByRegistrationNumber(
-  registrationNumber: string
-) {
-  const [student] = await db
-    .select({ id: students.id })
-    .from(students)
-    .where(eq(students.registrationNumber, registrationNumber))
-    .limit(1);
-  return student ?? null;
+export async function findStudentByRegistrationNumber(registrationNumber: string) {
+  return prisma.student.findUnique({
+    where: { registrationNumber },
+    select: { id: true },
+  });
 }
 
 export async function findStudentByEmail(email: string) {
-  const [student] = await db
-    .select({ id: students.id })
-    .from(students)
-    .where(eq(students.studentEmail, email))
-    .limit(1);
-  return student ?? null;
+  return prisma.student.findUnique({
+    where: { studentEmail: email },
+    select: { id: true },
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
-export async function createUserAndStudent(
-  clerkId: string,
-  data: RegisterStudentInput
-) {
-  return db.transaction(async (tx) => {
-    const [newUser] = await tx
-      .insert(users)
-      .values({
-        clerkId,
-        role: "student",
-        firstLogin: false,
-      })
-      .returning();
+export async function createUserAndStudent(clerkId: string, data: RegisterStudentInput) {
+  return prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: { clerkId, role: "student", firstLogin: false },
+    });
 
-    const [newStudent] = await tx
-      .insert(students)
-      .values({
+    const newStudent = await tx.student.create({
+      data: {
         userId: newUser.id,
         universityId: data.university_id,
         registrationNumber: data.registration_number,
@@ -90,8 +54,8 @@ export async function createUserAndStudent(
         otherNames: data.other_names,
         gender: data.gender,
         studentEmail: data.student_email,
-      })
-      .returning();
+      },
+    });
 
     return { user: newUser, student: newStudent };
   });
@@ -101,29 +65,18 @@ export async function createUserAndStudent(
 // Hostels (scoped to student's university)
 // ---------------------------------------------------------------------------
 
-export async function findHostelsByUniversityIdWithRooms(
-  universityId: string
-) {
-  const hostelList = await db
-    .select()
-    .from(hostels)
-    .where(eq(hostels.universityId, universityId));
+export async function findHostelsByUniversityIdWithRooms(universityId: string) {
+  const hostels = await prisma.hostel.findMany({
+    where: { universityId },
+    include: { rooms: true },
+  });
 
-  if (!hostelList.length) return [];
-
-  const roomList = await db
-    .select()
-    .from(rooms)
-    .where(inArray(rooms.hostelId, hostelList.map((h) => h.id)));
-
-  return hostelList.map((hostel) => ({
+  return hostels.map((hostel) => ({
     ...hostel,
-    rooms: roomList
-      .filter((r) => r.hostelId === hostel.id)
-      .map((r) => ({
-        ...r,
-        available_slots: r.capacity - r.occupiedSlots,
-      })),
+    rooms: hostel.rooms.map((r) => ({
+      ...r,
+      available_slots: r.capacity - r.occupiedSlots,
+    })),
   }));
 }
 
@@ -131,27 +84,16 @@ export async function findHostelByIdAndUniversityIdWithRooms(
   hostelId: string,
   universityId: string
 ) {
-  const [hostel] = await db
-    .select()
-    .from(hostels)
-    .where(
-      and(
-        eq(hostels.id, hostelId),
-        eq(hostels.universityId, universityId)
-      )
-    )
-    .limit(1);
+  const hostel = await prisma.hostel.findFirst({
+    where: { id: hostelId, universityId },
+    include: { rooms: true },
+  });
 
   if (!hostel) return null;
 
-  const roomList = await db
-    .select()
-    .from(rooms)
-    .where(eq(rooms.hostelId, hostelId));
-
   return {
     ...hostel,
-    rooms: roomList.map((r) => ({
+    rooms: hostel.rooms.map((r) => ({
       ...r,
       available_slots: r.capacity - r.occupiedSlots,
     })),
@@ -163,9 +105,8 @@ export async function findHostelByIdAndUniversityIdWithRooms(
 // ---------------------------------------------------------------------------
 
 export function findNotificationsByUserId(userId: string) {
-  return db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, userId))
-    .orderBy(desc(notifications.createdAt));
+  return prisma.notification.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
 }

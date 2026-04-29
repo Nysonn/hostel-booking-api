@@ -14,7 +14,7 @@ import * as repo from "./admin.repository";
 
 export async function getUsersList(role?: string) {
   const rows = await repo.findAllNonAdminUsers(role);
-  return rows.map(({ user, university, landlord, student }) => ({
+  return rows.map(({ university, landlord, student, ...user }) => ({
     ...user,
     profile: university ?? landlord ?? student ?? null,
   }));
