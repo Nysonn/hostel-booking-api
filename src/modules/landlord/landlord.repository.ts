@@ -106,6 +106,53 @@ export async function updateRoomById(
 // Bookings
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Bookings
+// ---------------------------------------------------------------------------
+
+export async function terminateBookingByLandlordTx(
+  bookingId: string,
+  hostelId: string,
+  landlordId: string
+) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findFirst({
+      where: {
+        id: bookingId,
+        room: { hostelId, hostel: { landlordId } },
+      },
+    });
+
+    if (!booking)
+      throw Object.assign(
+        new Error("Booking not found or does not belong to your hostel"),
+        { status: 404 }
+      );
+
+    if (booking.status !== "active")
+      throw Object.assign(new Error("Booking is not active"), { status: 400 });
+
+    const updatedBooking = await tx.booking.update({
+      where: { id: bookingId },
+      data: { status: "terminated" },
+    });
+
+    const room = await tx.room.findUnique({ where: { id: booking.roomId } });
+    if (room) {
+      const newOccupied = Math.max(0, room.occupiedSlots - 1);
+      await tx.room.update({
+        where: { id: booking.roomId },
+        data: {
+          occupiedSlots: newOccupied,
+          ...(!room.isAvailable && { isAvailable: true }),
+        },
+      });
+    }
+
+    return { booking: updatedBooking };
+  });
+}
+
 export async function findBookingsByHostelId(hostelId: string) {
   return prisma.booking.findMany({
     where: {

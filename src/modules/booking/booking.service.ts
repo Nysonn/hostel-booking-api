@@ -62,7 +62,7 @@ function fireBookingCreatedSideEffects(ctx: BookingContext) {
   ]).catch((err) => console.error("Booking side effects error:", err));
 }
 
-function fireTerminationSideEffects(ctx: BookingContext) {
+export function fireTerminationSideEffects(ctx: BookingContext) {
   const studentName = studentFullName(ctx);
   const hostel = ctx.room.hostel;
   const landlord = ctx.room.hostel.landlord;

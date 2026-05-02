@@ -5,6 +5,8 @@ import {
 import { uploadMultiple } from "../../utils/cloudinary";
 import type { CreateHostelInput, CreateRoomInput, UpdateRoomInput } from "./landlord.schema";
 import * as repo from "./landlord.repository";
+import { findBookingContext } from "../booking/booking.repository";
+import { fireTerminationSideEffects } from "../booking/booking.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -133,6 +135,26 @@ export async function modifyRoom(
 // ---------------------------------------------------------------------------
 // Bookings
 // ---------------------------------------------------------------------------
+
+export async function terminateBooking(
+  landlordUserId: string,
+  hostelId: string,
+  bookingId: string
+) {
+  const landlord = await requireLandlord(landlordUserId);
+
+  const { booking } = await repo.terminateBookingByLandlordTx(
+    bookingId,
+    hostelId,
+    landlord.id
+  );
+
+  findBookingContext(booking.id).then((ctx) => {
+    if (ctx) fireTerminationSideEffects(ctx);
+  });
+
+  return { booking };
+}
 
 export async function listHostelBookings(landlordUserId: string, hostelId: string) {
   const landlord = await requireLandlord(landlordUserId);
