@@ -103,6 +103,52 @@ export async function updateRoomById(
 }
 
 // ---------------------------------------------------------------------------
+// Bookings
+// ---------------------------------------------------------------------------
+
+export async function findBookingsByHostelId(hostelId: string) {
+  return prisma.booking.findMany({
+    where: {
+      room: { hostelId },
+    },
+    include: {
+      student: {
+        select: {
+          id: true,
+          registrationNumber: true,
+          surname: true,
+          otherNames: true,
+          gender: true,
+          studentEmail: true,
+        },
+      },
+      room: {
+        select: {
+          id: true,
+          roomType: true,
+          price: true,
+          capacity: true,
+          occupiedSlots: true,
+          isAvailable: true,
+        },
+      },
+      payments: {
+        select: {
+          id: true,
+          amount: true,
+          paymentType: true,
+          paymentMethod: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Notifications
 // ---------------------------------------------------------------------------
 

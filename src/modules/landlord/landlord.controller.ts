@@ -88,6 +88,18 @@ export const updateRoom: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const getHostelBookings: RequestHandler = async (req, res, next) => {
+  try {
+    const data = await service.listHostelBookings(
+      req.userContext!.user.id,
+      String(req.params.hostelId)
+    );
+    res.json({ success: true, message: "Bookings fetched successfully", data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getNotifications: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.listNotifications(req.userContext!.user.id);

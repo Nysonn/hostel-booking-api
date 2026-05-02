@@ -131,6 +131,16 @@ export async function modifyRoom(
 }
 
 // ---------------------------------------------------------------------------
+// Bookings
+// ---------------------------------------------------------------------------
+
+export async function listHostelBookings(landlordUserId: string, hostelId: string) {
+  const landlord = await requireLandlord(landlordUserId);
+  await requireOwnedHostel(landlord.id, hostelId);
+  return repo.findBookingsByHostelId(hostelId);
+}
+
+// ---------------------------------------------------------------------------
 // Notifications
 // ---------------------------------------------------------------------------
 

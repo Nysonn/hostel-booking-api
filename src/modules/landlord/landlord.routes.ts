@@ -36,6 +36,7 @@ protected_.post(
 
 protected_.get("/hostels", controller.getHostels);
 protected_.get("/hostels/:hostelId", controller.getHostel);
+protected_.get("/hostels/:hostelId/bookings", controller.getHostelBookings);
 
 protected_.post(
   "/hostels/:hostelId/rooms",
