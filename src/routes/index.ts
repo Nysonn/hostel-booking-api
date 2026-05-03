@@ -1,5 +1,6 @@
 import { Router } from "express";
 import adminRouter from "../modules/admin/admin.routes";
+import analyticsRouter from "../modules/admin/analytics.routes";
 import universityRouter from "../modules/university/university.routes";
 import landlordRouter from "../modules/landlord/landlord.routes";
 import studentRouter from "../modules/student/student.routes";
@@ -19,6 +20,7 @@ router.get("/health", (_req, res) => {
 
 // ── Module routers ─────────────────────────────────────────────────────────
 router.use("/admin", adminRouter);
+router.use("/admin/analytics", analyticsRouter);
 router.use("/university", universityRouter);
 router.use("/landlord", landlordRouter);
 router.use("/student", studentRouter);
