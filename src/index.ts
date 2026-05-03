@@ -15,7 +15,7 @@ const PORT = process.env.PORT ?? 3000;
 app.use(helmet());
 app.use(
   cors({
-    origin: ["http://localhost:8080", "http://localhost:5173"],
+    origin: ["http://localhost:8080", "http://localhost:5173", "https://hostel-booking-admin.vercel.app"],
   })
 );
 app.use(morgan("dev"));
