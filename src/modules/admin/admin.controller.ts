@@ -1,6 +1,24 @@
 import { RequestHandler } from "express";
-import { getUsersQuerySchema, createUniversitySchema } from "./admin.schema";
+import { getUsersQuerySchema, createUniversitySchema, adminLoginSchema } from "./admin.schema";
 import * as service from "./admin.service";
+
+export const login: RequestHandler = async (req, res, next) => {
+  try {
+    const parsed = adminLoginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(422).json({
+        success: false,
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+    const data = await service.loginAdmin(parsed.data);
+    res.json({ success: true, message: "Login successful", data });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const getMe: RequestHandler = async (req, res, next) => {
   try {

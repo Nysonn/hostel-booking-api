@@ -1,12 +1,49 @@
 import {
   createClerkUser,
   deleteClerkUser,
+  findClerkUserByEmail,
   suspendClerkUser,
   unsuspendClerkUser,
+  verifyClerkPassword,
 } from "../../utils/clerk";
 import { sendUniversityWelcomeEmail } from "../../utils/email";
-import type { CreateUniversityInput } from "./admin.schema";
+import type { AdminLoginInput, CreateUniversityInput } from "./admin.schema";
 import * as repo from "./admin.repository";
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export async function loginAdmin(input: AdminLoginInput) {
+  const clerkUser = await findClerkUserByEmail(input.email);
+  if (!clerkUser) {
+    throw Object.assign(new Error("Invalid email or password"), { status: 401 });
+  }
+
+  const verified = await verifyClerkPassword(clerkUser.id, input.password);
+  if (!verified.verified) {
+    throw Object.assign(new Error("Invalid email or password"), { status: 401 });
+  }
+
+  const user = await repo.findAdminByClerkId(clerkUser.id);
+  if (!user || user.role !== "admin") {
+    throw Object.assign(new Error("Access denied: not an admin account"), { status: 403 });
+  }
+
+  if (user.isSuspended) {
+    throw Object.assign(new Error("Account is suspended"), { status: 403 });
+  }
+
+  return {
+    id: user.id,
+    clerkId: user.clerkId,
+    role: user.role,
+    email: clerkUser.emailAddresses[0]?.emailAddress ?? input.email,
+    firstLogin: user.firstLogin,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Reads

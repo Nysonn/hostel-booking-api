@@ -2,6 +2,15 @@ import { createClerkClient } from "@clerk/express";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
+export async function findClerkUserByEmail(email: string) {
+  const result = await clerk.users.getUserList({ emailAddress: [email] });
+  return result.data[0] ?? null;
+}
+
+export async function verifyClerkPassword(userId: string, password: string) {
+  return clerk.users.verifyPassword({ userId, password });
+}
+
 export async function createClerkUser(params: {
   email: string;
   password: string;

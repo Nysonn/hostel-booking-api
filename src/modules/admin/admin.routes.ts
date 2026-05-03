@@ -6,6 +6,10 @@ import * as controller from "./admin.controller";
 
 const router = Router();
 
+// ── Public ──────────────────────────────────────────────────────────────────
+router.post("/login", controller.login);
+
+// ── Protected (admin only) ───────────────────────────────────────────────────
 router.use(requireAuth, requireRole("admin"), requireNotSuspended);
 
 router.get("/me", controller.getMe);

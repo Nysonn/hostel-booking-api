@@ -50,6 +50,21 @@ export async function findAdminByUserId(userId: string) {
   });
 }
 
+export async function findAdminByClerkId(clerkId: string) {
+  return prisma.user.findUnique({
+    where: { clerkId },
+    select: {
+      id: true,
+      clerkId: true,
+      role: true,
+      isSuspended: true,
+      firstLogin: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
