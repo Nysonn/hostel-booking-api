@@ -97,6 +97,8 @@ export async function suspendUser(userId: string) {
 export async function unsuspendUser(userId: string) {
   const user = await repo.findUserByInternalId(userId);
   if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
+  if (user.role === "admin")
+    throw Object.assign(new Error("Cannot unsuspend the admin"), { status: 403 });
 
   await Promise.all([
     repo.updateSuspension(userId, false),
