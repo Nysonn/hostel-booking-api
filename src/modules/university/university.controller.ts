@@ -42,11 +42,23 @@ export const logout: RequestHandler = async (req, res, next) => {
 export const createLandlord: RequestHandler = async (req, res, next) => {
   try {
     const files = (req.files ?? []) as Express.Multer.File[];
-    const data = await service.registerLandlord(req.userContext!.user.id, req.body as import("./university.schema").CreateLandlordInput, files);
+    const { user, landlord } = await service.registerLandlord(req.userContext!.user.id, req.body as import("./university.schema").CreateLandlordInput, files);
     res.status(201).json({
       success: true,
       message: "Landlord registered successfully",
-      data,
+      data: {
+        landlordCode: landlord.landlordCode,
+        id: landlord.id,
+        userId: user.id,
+        universityId: landlord.universityId,
+        fullName: landlord.fullName,
+        gender: landlord.gender,
+        email: landlord.email,
+        whatsappNumber: landlord.whatsappNumber,
+        maritalStatus: landlord.maritalStatus,
+        nin: landlord.nin,
+        createdAt: landlord.createdAt,
+      },
     });
   } catch (err) {
     next(err);
