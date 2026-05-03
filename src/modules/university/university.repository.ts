@@ -8,8 +8,54 @@ export async function findUniversityByUserId(userId: string) {
   return prisma.university.findUnique({ where: { userId } });
 }
 
+export async function findUniversityMeByUserId(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      isSuspended: true,
+      firstLogin: true,
+      createdAt: true,
+      updatedAt: true,
+      university: {
+        select: {
+          id: true,
+          universityName: true,
+          location: true,
+          type: true,
+          email: true,
+          createdAt: true,
+          updatedAt: true,
+          landlords: {
+            select: {
+              id: true,
+              fullName: true,
+              hostels: {
+                select: {
+                  _count: { select: { rooms: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export function findLandlordsByUniversityId(universityId: string) {
   return prisma.landlord.findMany({ where: { universityId } });
+}
+
+export async function findLandlordByUserIdAndUniversityId(
+  landlordUserId: string,
+  universityId: string
+) {
+  return prisma.landlord.findFirst({
+    where: { userId: landlordUserId, universityId },
+    include: { user: { select: { id: true, clerkId: true, isSuspended: true } } },
+  });
 }
 
 export function findStudentsByUniversityId(universityId: string) {
@@ -36,6 +82,10 @@ export async function updateFirstLogin(userId: string) {
   await prisma.user.update({ where: { id: userId }, data: { firstLogin: false } });
 }
 
+export async function updateSuspension(userId: string, isSuspended: boolean) {
+  await prisma.user.update({ where: { id: userId }, data: { isSuspended } });
+}
+
 export async function createUserAndLandlord(
   clerkId: string,
   universityId: string,
@@ -47,8 +97,7 @@ export async function createUserAndLandlord(
     landlordCode: string;
     whatsappNumber: string;
     email: string;
-  },
-  documentUrls: string[]
+  }
 ) {
   return prisma.$transaction(async (tx) => {
     const newUser = await tx.user.create({
@@ -63,7 +112,6 @@ export async function createUserAndLandlord(
         gender: data.gender,
         nin: data.nin,
         maritalStatus: data.maritalStatus,
-        ownershipDocuments: documentUrls,
         landlordCode: data.landlordCode,
         whatsappNumber: data.whatsappNumber,
         email: data.email,

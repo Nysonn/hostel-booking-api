@@ -2,7 +2,7 @@ dev:
 	docker-compose up --build
 
 migrate:
-	npx prisma migrate deploy
+	docker-compose run --rm --no-deps api npx prisma migrate deploy
 
 migrate-dev:
 	npx prisma migrate dev

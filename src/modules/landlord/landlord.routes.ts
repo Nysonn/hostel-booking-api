@@ -27,6 +27,8 @@ router.post("/auth/logout", requireAuth, controller.logout);
 const protected_ = Router();
 protected_.use(requireAuth, requireRole("landlord"), requireNotSuspended);
 
+protected_.get("/me", controller.getMe);
+
 protected_.post(
   "/hostels",
   upload.array("images", 10),
@@ -52,6 +54,8 @@ protected_.patch(
 );
 
 protected_.get("/notifications", controller.getNotifications);
+protected_.get("/notifications/count", controller.getNotificationCount);
+protected_.post("/notifications/mark-all-read", controller.markAllNotificationsRead);
 
 router.use(protected_);
 

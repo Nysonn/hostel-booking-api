@@ -2,6 +2,15 @@ import { RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
 import * as service from "./university.service";
 
+export const getMe: RequestHandler = async (req, res, next) => {
+  try {
+    const data = await service.getMe(req.userContext!.user.id);
+    res.json({ success: true, message: "Profile fetched successfully", data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const resetPassword: RequestHandler = async (req, res, next) => {
   try {
     const { clerkId, user } = req.userContext!;
@@ -66,6 +75,30 @@ export const getHostels: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.listHostels(req.userContext!.user.id);
     res.json({ success: true, message: "Hostels fetched successfully", data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const suspendLandlord: RequestHandler = async (req, res, next) => {
+  try {
+    await service.suspendLandlord(
+      req.userContext!.user.id,
+      String(req.params.userId)
+    );
+    res.json({ success: true, message: "Landlord suspended successfully", data: null });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unsuspendLandlord: RequestHandler = async (req, res, next) => {
+  try {
+    await service.unsuspendLandlord(
+      req.userContext!.user.id,
+      String(req.params.userId)
+    );
+    res.json({ success: true, message: "Landlord reactivated successfully", data: null });
   } catch (err) {
     next(err);
   }

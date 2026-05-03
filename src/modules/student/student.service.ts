@@ -18,6 +18,17 @@ async function requireStudent(userId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Me
+// ---------------------------------------------------------------------------
+
+export async function getMe(userId: string) {
+  const raw = await repo.findStudentMeByUserId(userId);
+  if (!raw) throw Object.assign(new Error("Student profile not found"), { status: 404 });
+  const { student, ...userFields } = raw;
+  return { ...userFields, profile: student };
+}
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
@@ -93,4 +104,13 @@ export async function getHostel(studentUserId: string, hostelId: string) {
 
 export function listNotifications(userId: string) {
   return repo.findNotificationsByUserId(userId);
+}
+
+export async function countNewNotifications(userId: string) {
+  const count = await repo.countUnreadNotificationsByUserId(userId);
+  return { count };
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  await repo.markAllNotificationsReadByUserId(userId);
 }

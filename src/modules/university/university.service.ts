@@ -2,10 +2,11 @@ import {
   createClerkUser,
   deleteClerkUser,
   revokeClerkSession,
+  suspendClerkUser,
+  unsuspendClerkUser,
   updateClerkUserPassword,
 } from "../../utils/clerk";
 import { sendLandlordRegistrationEmail } from "../../utils/email";
-import { uploadMultiple } from "../../utils/cloudinary";
 import type { CreateLandlordInput } from "./university.schema";
 import * as repo from "./university.repository";
 
@@ -37,6 +38,34 @@ async function requireUniversity(userId: string) {
 // Auth
 // ---------------------------------------------------------------------------
 
+export async function getMe(userId: string) {
+  const raw = await repo.findUniversityMeByUserId(userId);
+  if (!raw) throw Object.assign(new Error("University profile not found"), { status: 404 });
+
+  const { university, ...userFields } = raw;
+  if (!university) throw Object.assign(new Error("University profile not found"), { status: 404 });
+
+  const { landlords, ...universityFields } = university;
+
+  const byLandlord = landlords.map((l) => {
+    const totalRooms = l.hostels.reduce((sum, h) => sum + h._count.rooms, 0);
+    return {
+      landlordId: l.id,
+      fullName: l.fullName,
+      hostelCount: l.hostels.length,
+      totalRooms,
+    };
+  });
+
+  const totalRooms = byLandlord.reduce((sum, l) => sum + l.totalRooms, 0);
+
+  return {
+    ...userFields,
+    profile: universityFields,
+    roomStats: { totalRooms, byLandlord },
+  };
+}
+
 export async function resetPassword(
   clerkId: string,
   userId: string,
@@ -57,17 +86,9 @@ export async function logout(sessionId: string) {
 export async function registerLandlord(
   universityUserId: string,
   body: CreateLandlordInput,
-  files: Express.Multer.File[]
+  _files: Express.Multer.File[]
 ) {
   const university = await requireUniversity(universityUserId);
-
-  const documentUrls =
-    files.length > 0
-      ? await uploadMultiple(
-          files.map((f) => f.buffer),
-          "hostel-booking/ownership-docs"
-        )
-      : [];
 
   const landlordCode = await generateUniqueLandlordCode();
 
@@ -89,8 +110,7 @@ export async function registerLandlord(
         landlordCode,
         whatsappNumber: body.whatsapp_number,
         email: body.email,
-      },
-      documentUrls
+      }
     );
 
     sendLandlordRegistrationEmail({
@@ -110,6 +130,48 @@ export async function registerLandlord(
 export async function listLandlords(universityUserId: string) {
   const university = await requireUniversity(universityUserId);
   return repo.findLandlordsByUniversityId(university.id);
+}
+
+export async function suspendLandlord(
+  universityUserId: string,
+  landlordUserId: string
+) {
+  const university = await requireUniversity(universityUserId);
+  const landlord = await repo.findLandlordByUserIdAndUniversityId(
+    landlordUserId,
+    university.id
+  );
+  if (!landlord)
+    throw Object.assign(
+      new Error("Landlord not found or does not belong to your university"),
+      { status: 404 }
+    );
+
+  await Promise.all([
+    repo.updateSuspension(landlord.userId, true),
+    suspendClerkUser(landlord.user.clerkId),
+  ]);
+}
+
+export async function unsuspendLandlord(
+  universityUserId: string,
+  landlordUserId: string
+) {
+  const university = await requireUniversity(universityUserId);
+  const landlord = await repo.findLandlordByUserIdAndUniversityId(
+    landlordUserId,
+    university.id
+  );
+  if (!landlord)
+    throw Object.assign(
+      new Error("Landlord not found or does not belong to your university"),
+      { status: 404 }
+    );
+
+  await Promise.all([
+    repo.updateSuspension(landlord.userId, false),
+    unsuspendClerkUser(landlord.user.clerkId),
+  ]);
 }
 
 // ---------------------------------------------------------------------------

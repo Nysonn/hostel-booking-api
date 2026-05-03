@@ -8,6 +8,7 @@ const router = Router();
 
 router.use(requireAuth, requireRole("admin"), requireNotSuspended);
 
+router.get("/me", controller.getMe);
 router.get("/users", controller.getAllUsers);
 router.get("/universities", controller.getUniversities);
 router.get("/landlords", controller.getLandlords);

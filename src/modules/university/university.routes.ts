@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { requireAuth, requireNotSuspended, requireRole } from "../../middlewares/auth";
 import { validate } from "../../middlewares/validate";
-import { upload } from "../../config/multer";
 import { createLandlordSchema, resetPasswordSchema } from "./university.schema";
 import * as controller from "./university.controller";
 
@@ -22,14 +21,17 @@ router.post("/auth/logout", requireAuth, controller.logout);
 const protected_ = Router();
 protected_.use(requireAuth, requireRole("university"), requireNotSuspended);
 
+protected_.get("/me", controller.getMe);
+
 protected_.post(
   "/landlords",
-  upload.array("ownership_documents", 10),
   validate(createLandlordSchema),
   controller.createLandlord
 );
 
 protected_.get("/landlords", controller.getLandlords);
+protected_.patch("/landlords/:userId/suspend", controller.suspendLandlord);
+protected_.patch("/landlords/:userId/unsuspend", controller.unsuspendLandlord);
 protected_.get("/students", controller.getStudents);
 protected_.get("/hostels", controller.getHostels);
 

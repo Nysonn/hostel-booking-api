@@ -101,7 +101,6 @@ model Landlord {
   gender             Gender
   nin                String
   maritalStatus      String   @map("marital_status")
-  ownershipDocuments String[] @map("ownership_documents")
   landlordCode       String   @unique @map("landlord_code")
   whatsappNumber     String   @map("whatsapp_number")
   email              String   @unique

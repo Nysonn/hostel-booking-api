@@ -26,10 +26,25 @@ router.get(
   controller.getNotifications
 );
 
+router.get(
+  "/notifications/count",
+  requireAuth,
+  requireRole("student"),
+  controller.getNotificationCount
+);
+
+router.post(
+  "/notifications/mark-all-read",
+  requireAuth,
+  requireRole("student"),
+  controller.markAllNotificationsRead
+);
+
 // ── Protected (requireAuth + requireRole + requireNotSuspended) ─────────────
 const protected_ = Router();
 protected_.use(requireAuth, requireRole("student"), requireNotSuspended);
 
+protected_.get("/me", controller.getMe);
 protected_.get("/hostels", controller.getHostels);
 protected_.get("/hostels/:hostelId", controller.getHostel);
 

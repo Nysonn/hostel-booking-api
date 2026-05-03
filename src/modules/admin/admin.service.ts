@@ -12,6 +12,12 @@ import * as repo from "./admin.repository";
 // Reads
 // ---------------------------------------------------------------------------
 
+export async function getMe(userId: string) {
+  const user = await repo.findAdminByUserId(userId);
+  if (!user) throw Object.assign(new Error("Admin user not found"), { status: 404 });
+  return user;
+}
+
 export async function getUsersList(role?: string) {
   const rows = await repo.findAllNonAdminUsers(role);
   return rows.map(({ university, landlord, student, ...user }) => ({

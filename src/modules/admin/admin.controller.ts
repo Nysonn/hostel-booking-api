@@ -2,6 +2,15 @@ import { RequestHandler } from "express";
 import { getUsersQuerySchema, createUniversitySchema } from "./admin.schema";
 import * as service from "./admin.service";
 
+export const getMe: RequestHandler = async (req, res, next) => {
+  try {
+    const data = await service.getMe(req.userContext!.user.id);
+    res.json({ success: true, message: "Profile fetched successfully", data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getAllUsers: RequestHandler = async (req, res, next) => {
   try {
     const parsed = getUsersQuerySchema.safeParse(req.query);

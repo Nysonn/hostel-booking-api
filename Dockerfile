@@ -8,7 +8,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-CMD ["npx", "drizzle-kit", "migrate"]
+CMD ["npx", "prisma", "migrate", "deploy"]
 
 ################################
 # Stage 2 — dev (hot reload)

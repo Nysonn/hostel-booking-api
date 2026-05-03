@@ -21,6 +21,33 @@ export async function findStudentByUserId(userId: string) {
   return prisma.student.findUnique({ where: { userId } });
 }
 
+export async function findStudentMeByUserId(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      isSuspended: true,
+      firstLogin: true,
+      createdAt: true,
+      updatedAt: true,
+      student: {
+        select: {
+          id: true,
+          universityId: true,
+          registrationNumber: true,
+          surname: true,
+          otherNames: true,
+          gender: true,
+          studentEmail: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
+  });
+}
+
 export async function findStudentByRegistrationNumber(registrationNumber: string) {
   return prisma.student.findUnique({
     where: { registrationNumber },
@@ -108,5 +135,16 @@ export function findNotificationsByUserId(userId: string) {
   return prisma.notification.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function countUnreadNotificationsByUserId(userId: string) {
+  return prisma.notification.count({ where: { userId, isRead: false } });
+}
+
+export async function markAllNotificationsReadByUserId(userId: string) {
+  await prisma.notification.updateMany({
+    where: { userId, isRead: false },
+    data: { isRead: true },
   });
 }

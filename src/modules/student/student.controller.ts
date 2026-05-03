@@ -2,6 +2,15 @@ import { RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
 import * as service from "./student.service";
 
+export const getMe: RequestHandler = async (req, res, next) => {
+  try {
+    const data = await service.getMe(req.userContext!.user.id);
+    res.json({ success: true, message: "Profile fetched successfully", data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const register: RequestHandler = async (req, res, next) => {
   try {
     const data = await service.register(
@@ -73,6 +82,24 @@ export const getNotifications: RequestHandler = async (req, res, next) => {
       message: "Notifications fetched successfully",
       data,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getNotificationCount: RequestHandler = async (req, res, next) => {
+  try {
+    const data = await service.countNewNotifications(req.userContext!.user.id);
+    res.json({ success: true, message: "Notification count fetched successfully", data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const markAllNotificationsRead: RequestHandler = async (req, res, next) => {
+  try {
+    await service.markAllNotificationsRead(req.userContext!.user.id);
+    res.json({ success: true, message: "All notifications marked as read", data: null });
   } catch (err) {
     next(err);
   }

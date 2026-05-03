@@ -35,6 +35,21 @@ export async function findUserByInternalId(userId: string) {
   return prisma.user.findUnique({ where: { id: userId } });
 }
 
+export async function findAdminByUserId(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      clerkId: true,
+      role: true,
+      isSuspended: true,
+      firstLogin: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
