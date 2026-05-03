@@ -25,6 +25,7 @@ export async function getMe(userId: string) {
   const raw = await repo.findStudentMeByUserId(userId);
   if (!raw) throw Object.assign(new Error("Student profile not found"), { status: 404 });
   const { student, ...userFields } = raw;
+  if (!student) throw Object.assign(new Error("Student profile not found"), { status: 404 });
   return { ...userFields, profile: student };
 }
 

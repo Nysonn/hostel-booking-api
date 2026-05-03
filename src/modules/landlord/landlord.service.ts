@@ -39,6 +39,7 @@ export async function getMe(userId: string) {
   const raw = await repo.findLandlordMeByUserId(userId);
   if (!raw) throw Object.assign(new Error("Landlord profile not found"), { status: 404 });
   const { landlord, ...userFields } = raw;
+  if (!landlord) throw Object.assign(new Error("Landlord profile not found"), { status: 404 });
   return { ...userFields, profile: landlord };
 }
 

@@ -2,6 +2,7 @@ import {
   createClerkUser,
   deleteClerkUser,
   findClerkUserByEmail,
+  getClerkUserById,
   suspendClerkUser,
   unsuspendClerkUser,
   verifyClerkPassword,
@@ -52,7 +53,9 @@ export async function loginAdmin(input: AdminLoginInput) {
 export async function getMe(userId: string) {
   const user = await repo.findAdminByUserId(userId);
   if (!user) throw Object.assign(new Error("Admin user not found"), { status: 404 });
-  return user;
+  const clerkUser = await getClerkUserById(user.clerkId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress ?? null;
+  return { ...user, email };
 }
 
 export async function getUsersList(role?: string) {

@@ -46,6 +46,10 @@ export async function updateClerkUserPassword(clerkId: string, password: string)
   return clerk.users.updateUser(clerkId, { password });
 }
 
+export async function getClerkUserById(clerkId: string) {
+  return clerk.users.getUser(clerkId);
+}
+
 export async function revokeClerkSession(sessionId: string) {
   return clerk.sessions.revokeSession(sessionId);
 }
