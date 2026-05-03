@@ -977,7 +977,7 @@
               "code": 409,
               "_postman_previewlanguage": "json",
               "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "{\n  \"success\": false,\n  \"message\": \"You already have an active booking\"\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"You already have an active booking. Students can only book at one hostel at a time.\"\n}"
             }
           ]
         },

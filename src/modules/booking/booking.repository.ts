@@ -29,7 +29,7 @@ export async function createBookingTx(studentId: string, roomId: string) {
     });
 
     if (existingBooking)
-      throw Object.assign(new Error("You already have an active booking"), { status: 400 });
+      throw Object.assign(new Error("You already have an active booking. Students can only book at one hostel at a time."), { status: 400 });
 
     // Insert booking
     const newBooking = await tx.booking.create({
