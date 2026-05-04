@@ -20,7 +20,7 @@ export async function createBookingTx(studentId: string, roomId: string) {
     if (!room)
       throw Object.assign(new Error("Room not found"), { status: 404 });
 
-    if (!room.isAvailable || room.occupiedSlots >= room.capacity)
+    if (!room.isAvailable || room.occupiedSlots >= room.totalRooms * room.capacity)
       throw Object.assign(new Error("Room has no available slots"), { status: 400 });
 
     // Prevent double-booking
@@ -38,7 +38,7 @@ export async function createBookingTx(studentId: string, roomId: string) {
 
     // Update room occupancy
     const newOccupied = room.occupiedSlots + 1;
-    const nowFull = newOccupied >= room.capacity;
+    const nowFull = newOccupied >= room.totalRooms * room.capacity;
 
     await tx.room.update({
       where: { id: roomId },

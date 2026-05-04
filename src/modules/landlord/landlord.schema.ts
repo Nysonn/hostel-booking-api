@@ -14,6 +14,7 @@ export const createHostelSchema = z.object({
 export const createRoomSchema = z.object({
   room_type: z.enum(["single_self_contained", "double_self_contained"]),
   price: z.number().positive("Price must be a positive number"),
+  number_of_rooms: z.number().int().positive("Number of rooms must be a positive integer"),
   capacity: z.number().int().positive("Capacity must be a positive integer"),
 });
 
@@ -22,6 +23,7 @@ export const updateRoomSchema = z.object({
     .enum(["single_self_contained", "double_self_contained"])
     .optional(),
   price: z.number().positive().optional(),
+  number_of_rooms: z.number().int().positive().optional(),
   capacity: z.number().int().positive().optional(),
 });
 

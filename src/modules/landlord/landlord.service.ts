@@ -120,6 +120,7 @@ export async function addRoom(
   return repo.createRoom(hostelId, {
     roomType: body.room_type,
     price: body.price,
+    totalRooms: body.number_of_rooms,
     capacity: body.capacity,
   });
 }
@@ -140,6 +141,7 @@ export async function modifyRoom(
   return repo.updateRoomById(roomId, {
     roomType: body.room_type,
     price: body.price,
+    totalRooms: body.number_of_rooms,
     capacity: body.capacity,
   });
 }

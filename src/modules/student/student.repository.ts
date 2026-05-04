@@ -102,7 +102,7 @@ export async function findHostelsByUniversityIdWithRooms(universityId: string) {
     ...hostel,
     rooms: hostel.rooms.map((r) => ({
       ...r,
-      available_slots: r.capacity - r.occupiedSlots,
+      available_slots: r.totalRooms * r.capacity - r.occupiedSlots,
     })),
   }));
 }
@@ -122,7 +122,7 @@ export async function findHostelByIdAndUniversityIdWithRooms(
     ...hostel,
     rooms: hostel.rooms.map((r) => ({
       ...r,
-      available_slots: r.capacity - r.occupiedSlots,
+      available_slots: r.totalRooms * r.capacity - r.occupiedSlots,
     })),
   };
 }

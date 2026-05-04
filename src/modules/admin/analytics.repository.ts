@@ -26,7 +26,10 @@ export async function fetchOverviewCounts() {
   ]);
 
   const occupiedSlots = await prisma.room.aggregate({ _sum: { occupiedSlots: true } });
-  const totalCapacity = await prisma.room.aggregate({ _sum: { capacity: true } });
+  const totalCapacityResult = await prisma.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(total_rooms * capacity), 0) AS total FROM rooms
+  `;
+  const totalCapacity = Number(totalCapacityResult[0]?.total ?? 0);
 
   return {
     totalUniversities,
@@ -38,7 +41,7 @@ export async function fetchOverviewCounts() {
     totalTerminatedBookings,
     suspendedUsers,
     totalOccupiedSlots: occupiedSlots._sum.occupiedSlots ?? 0,
-    totalCapacity: totalCapacity._sum.capacity ?? 0,
+    totalCapacity,
   };
 }
 
@@ -106,12 +109,16 @@ export async function fetchUniversityBreakdown() {
     },
   });
 
-  // Fetch room totals per university in one query
-  const roomsPerUniversity = await prisma.room.groupBy({
-    by: ["hostelId"],
-    _sum: { capacity: true, occupiedSlots: true },
-    _count: { id: true },
-  });
+  // Fetch room totals per university using raw SQL to compute total_rooms * capacity for beds
+  type RoomAgg = { hostel_id: string; total_rooms: bigint; total_capacity: bigint; occupied_slots: bigint };
+  const roomsPerUniversity = await prisma.$queryRaw<RoomAgg[]>`
+    SELECT hostel_id,
+           SUM(total_rooms)            AS total_rooms,
+           SUM(total_rooms * capacity) AS total_capacity,
+           SUM(occupied_slots)         AS occupied_slots
+    FROM   rooms
+    GROUP  BY hostel_id
+  `;
 
   // Map hostelId → universityId
   const hostels = await prisma.hostel.findMany({
@@ -125,7 +132,7 @@ export async function fetchUniversityBreakdown() {
   >();
 
   for (const row of roomsPerUniversity) {
-    const univId = hostelUnivMap.get(row.hostelId);
+    const univId = hostelUnivMap.get(row.hostel_id);
     if (!univId) continue;
     const existing = univRoomMap.get(univId) ?? {
       totalRooms: 0,
@@ -133,9 +140,9 @@ export async function fetchUniversityBreakdown() {
       occupiedSlots: 0,
     };
     univRoomMap.set(univId, {
-      totalRooms: existing.totalRooms + row._count.id,
-      totalCapacity: existing.totalCapacity + (row._sum.capacity ?? 0),
-      occupiedSlots: existing.occupiedSlots + (row._sum.occupiedSlots ?? 0),
+      totalRooms: existing.totalRooms + Number(row.total_rooms),
+      totalCapacity: existing.totalCapacity + Number(row.total_capacity),
+      occupiedSlots: existing.occupiedSlots + Number(row.occupied_slots),
     });
   }
 

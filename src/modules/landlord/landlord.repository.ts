@@ -100,14 +100,22 @@ export async function createRoom(
   data: {
     roomType: "single_self_contained" | "double_self_contained";
     price: number;
+    totalRooms: number;
     capacity: number;
   }
 ) {
-  return prisma.room.create({
-    data: {
+  return prisma.room.upsert({
+    where: { hostelId_roomType: { hostelId, roomType: data.roomType } },
+    update: {
+      price: data.price,
+      totalRooms: data.totalRooms,
+      capacity: data.capacity,
+    },
+    create: {
       hostelId,
       roomType: data.roomType,
       price: data.price,
+      totalRooms: data.totalRooms,
       capacity: data.capacity,
     },
   });
@@ -118,6 +126,7 @@ export async function updateRoomById(
   data: {
     roomType?: "single_self_contained" | "double_self_contained";
     price?: number;
+    totalRooms?: number;
     capacity?: number;
   }
 ) {
@@ -126,6 +135,7 @@ export async function updateRoomById(
     data: {
       ...(data.roomType !== undefined && { roomType: data.roomType }),
       ...(data.price !== undefined && { price: data.price }),
+      ...(data.totalRooms !== undefined && { totalRooms: data.totalRooms }),
       ...(data.capacity !== undefined && { capacity: data.capacity }),
     },
   });
