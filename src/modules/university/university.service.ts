@@ -85,8 +85,7 @@ export async function logout(sessionId: string) {
 
 export async function registerLandlord(
   universityUserId: string,
-  body: CreateLandlordInput,
-  _files: Express.Multer.File[]
+  body: CreateLandlordInput
 ) {
   const university = await requireUniversity(universityUserId);
 

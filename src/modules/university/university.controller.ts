@@ -41,8 +41,7 @@ export const logout: RequestHandler = async (req, res, next) => {
 
 export const createLandlord: RequestHandler = async (req, res, next) => {
   try {
-    const files = (req.files ?? []) as Express.Multer.File[];
-    const { user, landlord } = await service.registerLandlord(req.userContext!.user.id, req.body as import("./university.schema").CreateLandlordInput, files);
+    const { user, landlord } = await service.registerLandlord(req.userContext!.user.id, req.body as import("./university.schema").CreateLandlordInput);
     res.status(201).json({
       success: true,
       message: "Landlord registered successfully",
